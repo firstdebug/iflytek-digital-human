@@ -1,14 +1,14 @@
 {
-  "name": "avatar-platform-codex",
+  "name": "avatar-grill-marketplace",
   "interface": {
-    "displayName": "Avatar Platform Codex"
+    "displayName": "Avatar Grill"
   },
   "plugins": [
     {
-      "name": "avatar-platform",
+      "name": "avatar-grill",
       "source": {
         "source": "local",
-        "path": "./plugins/avatar-platform"
+        "path": "./"
       },
       "policy": {
         "installation": "AVAILABLE",

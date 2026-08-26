@@ -1,37 +1,21 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "avatar-platform-marketplace",
-  "description": "讯飞虚拟人交互平台插件市场 - 提供从零代码到深度集成的全流程接入助手",
+  "name": "avatar-grill-marketplace",
+  "description": "讯飞虚拟人证据驱动的 Grill 插件",
   "owner": {
     "name": "firstdebug",
     "email": "shfan4@iflytek.com"
   },
   "plugins": [
     {
-      "name": "avatar-platform",
-      "description": "讯飞虚拟人交互平台全流程接入助手 - 从零代码快速搭建到 SDK/WebAPI 深度集成,支持 Web 对话模板、数字人直播、三端 SDK 开发、后端报文接入",
+      "name": "avatar-grill",
+      "description": "集中确认需求、查询平台事实并按执行契约实施讯飞虚拟人任务",
       "author": {
         "name": "firstdebug",
         "email": "shfan4@iflytek.com"
       },
       "category": "development",
-      "source": "./claude/avatar-platform",
-      "homepage": "https://virtual-man.xfyun.cn/",
-      "keywords": [
-        "xfyun",
-        "avatar",
-        "digital-human",
-        "web-sdk",
-        "android-sdk",
-        "ios-sdk",
-        "webapi",
-        "live-streaming",
-        "web-template",
-        "nlp",
-        "asr",
-        "tts",
-        "iflytek"
-      ]
+      "source": "./"
     }
   ]
 }

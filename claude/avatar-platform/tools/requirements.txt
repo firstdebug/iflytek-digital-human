@@ -1,7 +1,0 @@
-# tools/*.py 运行依赖（第三方库；其余 import 为 Python 标准库）
-# 安装： pip install -r tools/requirements.txt
-# 版本为已知稳定版，可按环境上调。
-
-cryptography==44.0.0   # 密钥本地加密存储 (xfyun_secrets.py)
-requests==2.32.3       # 平台 API 调用
-playwright==1.49.1     # 浏览器自动化；装库后还需执行： playwright install chromium

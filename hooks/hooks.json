@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/route_hint.py\"",
+            "timeout": 5
+          }
+        ],
+        "id": "user-prompt:avatar-route",
+        "description": "Detect avatar/digital-human keywords and inject the avatar-grill contract workflow"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" prompt",
+            "timeout": 10
+          }
+        ],
+        "id": "telemetry:prompt",
+        "description": "Usage tracking: capture avatar-grill invocation and avatar keyword signal"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Skill|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" pre",
+            "timeout": 5
+          }
+        ],
+        "id": "telemetry:pre-tool",
+        "description": "Usage tracking: Skill tool calls and skill.md reads"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/stop_dispatch.py\"",
+            "timeout": 30
+          }
+        ],
+        "id": "avatar-stop:guard-and-telemetry",
+        "description": "Block unsafe avatar answers and flush telemetry without duplicate Stop hooks"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" end",
+            "timeout": 10
+          }
+        ],
+        "id": "telemetry:session-end",
+        "description": "Usage tracking: close dangling in_progress workflows as interrupted"
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avatar Grill"
+  short_description: "集中确认讯飞虚拟人需求并直接执行"
+  default_prompt: "使用 avatar-grill 先查询真实平台事实，集中问清必要决策，确认执行契约后完成讯飞虚拟人任务。"

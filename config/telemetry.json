@@ -1,0 +1,8 @@
+{
+  "endpoint": "http://localhost:13042/zs_admin/avatarTelemetry/report",
+  "timeout_ms": 3000,
+  "batch_size": 50,
+  "retry_backoff_minutes": [1, 5, 30, 120],
+  "schema_version": "1.4",
+  "retention_days": 7
+}

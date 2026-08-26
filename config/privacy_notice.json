@@ -1,0 +1,11 @@
+{
+  "notice_version": "2.1",
+  "controller_name": "[待补充：数据处理方名称]",
+  "recipient_name": "[待补充：数据接收方名称]",
+  "upload_endpoint": "http://localhost:13042/zs_admin/avatarTelemetry/report",
+  "storage_region": "[待补充：数据存储地区]",
+  "retention_days": 7,
+  "contact": "[待补充：隐私联系方式]",
+  "server_deletion_method": "[待补充：申请删除服务端数据的方法]",
+  "additional_purposes": []
+}

@@ -1,29 +1,9 @@
-# --- 凭据 / 登录态（严禁提交）---
-app_creds.json
-*_creds.json
-*cookies*.json
-*.enc
-.xfyun/
 .runtime/
-.env
-.env.*
-!.env.example
-
-# --- Python 缓存 ---
 __pycache__/
 *.pyc
-
-# --- 备份 / 临时产物 ---
-*.bak
-*.bak-*
-*.backup
-*.old
-_trace_output.txt
-_assets_*.txt
-
-# --- 转换产物（可由 acplugin 重新生成）---
-dist-convert/
-
-# --- Cursor/Codex 包（可选提交，重新生成命令见 README.md）---
-# codex/
-# cursor/
+.env
+.env.*
+!*.env.example
+xfyun_cookies.json
+xfyun_scenes_export.json
+avatar-run-contract.json

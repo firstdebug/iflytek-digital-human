@@ -1,96 +1,33 @@
-# avatar-platform
+# avatar-grill
 
-讯飞虚拟人交互平台接入插件，覆盖 Web 对话模板、数字人直播、Web/Android/iOS SDK、WebAPI、模型配置、知识库、凭据获取和故障排查。
+独立的讯飞虚拟人 Grill Skill。本地包只暴露 `avatar-grill` 一个入口，使用集中问题前沿和执行契约，不提供流程模式选择。
 
-本仓库同时发布 Claude Code、Codex 和 Cursor 版本。三者使用独立目录；增加或更新 Cursor 包不会改变 Claude Code、Codex 的安装入口。
-
-## 安装
-
-### Claude Code
-
-```bash
-claude plugin marketplace add https://github.com/firstdebug/avatar-platform.git
-claude plugin install avatar-platform@avatar-platform-marketplace
-```
-
-验证：
-
-```bash
-claude plugin list
-```
-
-### Codex
-
-```bash
-codex plugin marketplace add firstdebug/avatar-platform --ref main
-codex plugin add avatar-platform@avatar-platform-codex
-```
-
-验证：
-
-```bash
-codex plugin list
-```
-
-安装或更新后，请新建一个 Codex 任务，使新的 Skills 和 agents 生效。
-
-### Cursor
-
-Cursor 当前推荐通过 Dashboard 导入 GitHub 插件仓库：
-
-1. 打开 Cursor Dashboard 的 `Plugins` -> `Team Marketplaces`。
-2. 选择 `Add Marketplace` -> `Import from Repo`。
-3. 输入 `https://github.com/firstdebug/avatar-platform` 并导入。
-4. 在 Cursor 的 `Customize` -> `Plugins` 或 `Customize` -> `Skills` 中确认 `avatar-platform` 已启用。
-
-仓库根目录的 `.cursor-plugin/plugin.json` 专门用于 Cursor 导入，实际内容位于 `cursor/skills/`、`cursor/tools/`、`cursor/config/`、`cursor/rules/` 和 `cursor/agents/`。也可以只将 `cursor/skills/` 复制到项目的 `.cursor/skills/` 或用户目录 `~/.cursor/skills/`。
+它覆盖现有 avatar-platform 的 Web、Android、iOS、WebAPI、模板、直播、凭据、模型、知识库、交互、配置、排障、验证和授权后异步遥测能力。专业资料以内置 references 保存，平台工具以内置 `tools/` 保存；Claude Hook 位于 `hooks/`。
 
 ## 使用
 
-统一入口为 `avatar-workflow-entry`。也可以直接描述需求，例如：
+显式调用 `avatar-grill`。它会先查询平台事实，再按 Grill 回合格式集中询问仍会改变执行路径的用户决策，生成 `.avatar/avatar-run-contract.json`，等待一次确认，随后直接执行和验证。
 
-- 创建 Web 智能客服虚拟人
-- 在 Android 应用中接入虚拟人 SDK
-- 通过 WebAPI 从后端驱动虚拟人
-- 配置大模型或知识库
-- 排查鉴权、黑屏、无声音或网络问题
+请只安装整个仓库，并与旧 `avatar-platform` 二选一；不要复制 `skills/avatar-grill/` 子目录，也不要同时启用两个插件。
 
-## 仓库结构
+## 本地校验
 
-```text
-avatar-platform/
-├─ .claude-plugin/marketplace.json  # Claude Code marketplace
-├─ .agents/plugins/marketplace.json  # Codex marketplace
-├─ .cursor-plugin/plugin.json        # Cursor 根仓库插件清单
-├─ claude/avatar-platform/           # Claude Code 自包含插件
-├─ plugins/avatar-platform/          # Codex 自包含插件
-├─ cursor/                           # Cursor 适配包
-└─ README.md
+```powershell
+python .\skills\avatar-grill\scripts\validate_contract.py .\path\to\project\.avatar\avatar-run-contract.json
 ```
 
-各平台只读取自己的 manifest 和包目录：
+本分支用于在 `firstdebug/avatar-platform` 中独立测试 `avatar-grill`。原版仍在 `main` / `avatar-platform-original` 分支。
 
-- Claude Code：`claude/avatar-platform/`
-- Codex：`plugins/avatar-platform/`
-- Cursor：`cursor/`
-
-## 运行依赖
-
-Cursor 工具需要 Python 3.8+：
+## GitHub 分支测试
 
 ```bash
-pip install -r cursor/tools/requirements.txt
-playwright install chromium
+# Claude Code
+claude plugin marketplace add https://github.com/firstdebug/avatar-platform.git --ref avatar-grill
+claude plugin install avatar-grill@avatar-grill-marketplace
+
+# Codex
+codex plugin marketplace add firstdebug/avatar-platform --ref avatar-grill
+codex plugin add avatar-grill@avatar-grill-marketplace
 ```
 
-Claude Code 和 Codex 工具仍分别从各自包目录运行。
-
-## 安全
-
-- 不要提交 `.runtime/`、Cookie、`.env`、API Key 或 API Secret。
-- Web 生产接入应在服务端签名，不要把 `apiSecret` 写入前端代码。
-
-## 版本
-
-当前版本：`1.0.0`
-许可证：MIT
+Cursor 在插件市场导入仓库时选择 `avatar-grill` 分支。测试时不要同时启用原版 `avatar-platform`，避免两套路由 Hook 同时注入。

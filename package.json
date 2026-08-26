@@ -1,0 +1,7 @@
+{
+  "name": "avatar-grill",
+  "version": "0.1.0",
+  "description": "Evidence-driven standalone skill for XFYUN avatar workflows",
+  "license": "MIT",
+  "skills": "./skills/"
+}

@@ -1,0 +1,586 @@
+# 工具注册表
+
+# 讯飞虚拟人平台管理工具已集成
+# 基于 Python + Playwright，支持登录、查询、模型管理、密钥安全等
+
+tools:
+  # ========== 认证与会话 ==========
+
+  - name: xfyun-login
+    description: 浏览器自动化登录，获取会话 Cookie
+    type: script
+    path: tools/xfyun_common.py
+    function: get_session
+    input:
+      force_login: boolean  # 是否强制重新登录
+    output:
+      uid: string           # 账号 ID (account_id)
+      session: object       # requests.Session 对象
+    security:
+      sensitive_output: false  # Cookie 默认保存到插件根目录 .runtime/，可用环境变量覆盖
+    required: false
+
+  # ========== 服务查询 ==========
+
+  - name: query-services
+    description: 查询账号下所有场景及 API 密钥
+    type: script
+    path: tools/xfyun_query_services.py
+    input: {}
+    output:
+      scenes:
+        - sceneName: string
+          sceneId: string
+          appId: string
+          apiKey: string  # 已脱敏
+          apiSecret: string  # 已脱敏
+    security:
+      sensitive_output: true  # 虽然已脱敏，但仍标记为敏感
+      export_file: xfyun_scenes_export.json
+    required: false
+
+  # ========== 模型管理 ==========
+
+  - name: list-models
+    description: 列出所有可用模型（官方 + 自有）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: list
+    input: {}
+    output:
+      models:
+        - name: string
+          model: string
+          modelType: integer  # 1=官方 2=自有
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: check-scene-capability
+    description: 检查场景是否具备对话能力（LLM 授权）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: check
+    input:
+      sceneId: string
+    output:
+      hasCapability: boolean
+      auths: array
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: bind-model
+    description: 绑定模型到场景并配置 NLP
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: bind
+    input:
+      sceneId: string
+      modelName: string
+    output:
+      success: boolean
+      nlpType: string  # xinghuo | openai
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: publish-scene
+    description: 发布场景配置（使配置生效）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: publish
+    input:
+      sceneId: string
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: create-custom-model
+    description: 创建自有模型（需要交互式输入 apiKey）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: create
+    input:
+      name: string
+      model: string
+      introduce: string
+      apiUrl: string
+      # apiKey 通过交互式输入
+    output:
+      modelId: string
+    security:
+      sensitive_input: [apiKey]
+    required: false
+
+  - name: update-model-key
+    description: 更新模型的 API 密钥（安全流程）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: update
+    input:
+      modelName: string
+      # apiKey 通过交互式输入或文件读取
+    output:
+      success: boolean
+    security:
+      sensitive_input: [apiKey]
+    required: false
+
+  # ========== 场景配置查询 ==========
+
+  - name: query-scene-config
+    description: 查询场景的完整配置（NLP + 交互）
+    type: script
+    path: tools/xfyun_model_manage.py
+    command: query
+    input:
+      sceneId: string
+    output:
+      nlpConfig: object
+      interactConfig: object
+    security:
+      sensitive_output: true  # 可能包含 apiKey
+    required: false
+
+  # ========== 密钥管理 ==========
+
+  - name: mask-secret
+    description: 脱敏显示密钥值
+    type: python-function
+    path: tools/xfyun_secrets.py
+    function: mask_secret
+    input:
+      value: string
+      show_prefix: integer  # 默认 4
+      show_suffix: integer  # 默认 4
+    output:
+      masked: string
+    security:
+      sensitive_input: [value]
+    required: false
+
+  - name: save-secret-encrypted
+    description: 加密保存密钥到本地
+    type: python-function
+    path: tools/xfyun_secrets.py
+    function: save_secret
+    input:
+      key_id: string
+      value: string
+    output:
+      saved_path: string  # 默认 <plugin-root>/.runtime/secrets/secrets.enc
+    security:
+      sensitive_input: [value]
+    required: false
+
+  - name: get-secret-encrypted
+    description: 解密读取本地密钥
+    type: python-function
+    path: tools/xfyun_secrets.py
+    function: get_secret
+    input:
+      key_id: string
+    output:
+      value: string
+    security:
+      sensitive_output: true
+    required: false
+
+  # ========== Web SDK 交付编排 ==========
+
+  - name: web-delivery
+    description: 固定执行 Web SDK 凭据、SDK、项目专属服务、端口、浏览器证据和最终完成门禁
+    type: script
+    path: tools/web_delivery.py
+    command: run
+    input:
+      project: string
+      appId: string
+      sceneId: string
+      interaction: string
+    output:
+      status: string
+      ready_to_deliver: boolean
+      port: integer
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: websocket-auth
+    description: 生成并校验 Web SDK canonical signed URL handler，禁止模型手写 HMAC
+    type: script
+    path: tools/websocket_auth.py
+    command: install
+    input:
+      project: string
+    output:
+      module: string
+      sha256: string
+    security:
+      sensitive_output: false
+    required: false
+
+  # ========== 知识库管理 ==========
+
+  - name: list-knowledge-bases
+    description: 列出所有知识库
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: list
+    input:
+      page: integer    # 页码，默认1
+      size: integer    # 每页数量，默认20
+      name: string     # 可选：按名称筛选
+    output:
+      items:
+        - id: string
+          name: string
+          labelName: string
+          status: integer  # 1=启用 0=禁用
+          docCount: integer
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: list-kb-labels
+    description: 列出知识库标签
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: labels
+    input: {}
+    output:
+      labels:
+        - id: string
+          name: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: list-kb-models
+    description: 列出可用的向量模型和LLM模型
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: models
+    input: {}
+    output:
+      vector_models: array
+      llm_models: array
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: create-kb-label
+    description: 创建知识库标签
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: create-label
+    input:
+      name: string
+    output:
+      labelId: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: create-knowledge-base
+    description: 创建知识库
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: create-kb
+    input:
+      name: string
+      label: string      # 标签ID
+      desc: string       # 可选：描述
+      vector: string     # 可选：向量模型
+      llm: string        # 可选：LLM模型
+    output:
+      libId: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: upload-kb-document
+    description: 上传文档到知识库
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: upload
+    input:
+      libId: string
+      filepath: string
+      category: string   # 可选：分类ID
+      wait: boolean      # 是否等待处理完成
+    output:
+      docId: string
+      status: string     # 0=处理中 1=成功 2=失败
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: enable-kb-for-scene
+    description: 为场景启用知识库对话
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: enable
+    input:
+      sceneId: string
+      libId: string
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: disable-kb-for-scene
+    description: 为场景禁用知识库对话
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: disable
+    input:
+      sceneId: string
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: query-kb-versions
+    description: 查询知识库的版本列表
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: versions
+    input:
+      libId: string
+    output:
+      versions:
+        - version: string
+          status: integer  # 1=生效 0=未生效
+          docCount: integer
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: query-kb-docs
+    description: 查询知识库的文档列表
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: docs
+    input:
+      libId: string
+      version: string    # 可选：版本号
+      page: integer
+      size: integer
+    output:
+      items:
+        - id: string
+          name: string
+          status: integer  # 0=处理中 1=成功 2=失败
+          chunkNum: integer  # 段落数
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: query-scene-kb-status
+    description: 查询场景当前的知识库配置
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: status
+    input:
+      sceneId: string
+    output:
+      enabled: boolean
+      libId: string
+      libName: string
+      chain: string      # 调用链
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: set-kb-chain
+    description: 设置场景的知识库调用链
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: chain
+    input:
+      sceneId: string
+      chain: string      # 例如: "docqa,xinghuo" 或 "xinghuo,docqa"
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: publish-kb-scene
+    description: 发布场景的知识库配置
+    type: script
+    path: tools/xfyun_knowledge.py
+    command: publish
+    input:
+      sceneId: string
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  # ========== Web 对话模板应用 ==========
+
+  - name: list-templates
+    description: 列出可用的 Web 对话模板（智能客服/H5/大屏交互等）
+    type: script
+    path: tools/xfyun_template.py
+    command: list-templates
+    input: {}
+    output:
+      templates:
+        - id: integer     # 1大屏/3Web客服/4弹窗/7H5对话/11H5通话
+          name: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: create-template-app
+    description: 创建 Web 对话模板应用（4步配置+资产授权+自动发布+跳转浏览器）
+    type: script
+    path: tools/xfyun_template.py
+    command: create
+    input:
+      templateId: integer   # 1/3/4/7/11
+      appId: string
+      name: string
+      desc: string          # 可选
+      no-browser: boolean   # 可选，跳过浏览器跳转
+    output:
+      sceneId: string
+      accessUrl: string     # 访问链接
+      configUrl: string     # 配置页面
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: publish-template-app
+    description: 发布 Web 模板应用（可绑定域名/有效期，跳转浏览器）
+    type: script
+    path: tools/xfyun_template.py
+    command: publish
+    input:
+      sceneId: string
+      domain: string        # 可选，授权域名
+      expire: integer       # 可选，有效期时间戳(毫秒)，0=永久
+      app: string           # 可选，appId（用于跳转配置页面）
+      no-browser: boolean   # 可选
+    output:
+      success: boolean
+      accessUrl: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: update-template-bg
+    description: 更新模板应用背景图（上传本地图片）
+    type: script
+    path: tools/xfyun_template.py
+    command: update-bg
+    input:
+      sceneId: string
+      imagePath: string
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: update-template-avatar
+    description: 更新模板应用的形象和发音人（自动授权新资产）
+    type: script
+    path: tools/xfyun_template.py
+    command: update-avatar
+    input:
+      sceneId: string
+      anchorId: string
+      vcn: string
+      app: string           # 可选，appId
+    output:
+      success: boolean
+    security:
+      sensitive_output: false
+    required: false
+
+  # ========== 虚拟人直播项目 ==========
+
+  - name: create-live-project
+    description: 创建虚拟人直播项目（10步：场景/模板/NLP/交互/授权/商品/分镜/脚本+自动发布+跳转浏览器）
+    type: script
+    path: tools/xfyun_live.py
+    command: create
+    input:
+      appId: string
+      name: string
+      desc: string          # 可选
+      anchor: string        # 可选，形象ID，默认111310001
+      vcn: string           # 可选，发音人，默认x4_lingxiaoqi_oral
+      no-browser: boolean   # 可选
+    output:
+      sceneId: string
+      productId: string     # 商品ID
+      storyboardId: string  # 分镜ID
+      liveUrl: string       # 直播间链接
+      configUrl: string     # 配置页面
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: list-live-scenes
+    description: 列出账号下的直播场景
+    type: script
+    path: tools/xfyun_live.py
+    command: list
+    input: {}
+    output:
+      scenes:
+        - sceneId: string
+          sceneName: string
+          appId: string
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: query-live-scene
+    description: 查询指定直播场景详情
+    type: script
+    path: tools/xfyun_live.py
+    command: query
+    input:
+      sceneId: string
+    output:
+      scene: object
+    security:
+      sensitive_output: false
+    required: false
+
+# ========== 工具依赖 ==========
+
+dependencies:
+  python: ">=3.8"
+  packages:
+    - playwright
+    - requests
+    - cryptography
+  post_install:
+    - playwright install chromium
+
+# ========== 使用说明 ==========
+
+# 1. 安装依赖
+#    pip install playwright requests cryptography
+#    playwright install chromium
+#
+# 2. 首次登录
+#    python tools/xfyun_common.py
+#    (会自动拉起浏览器登录)
+#
+# 3. Skills 调用
+#    avatar-credentials skill 可调用 query-services 自动获取凭据
+#    avatar-model-config skill 可调用 bind-model/publish-scene 配置模型
