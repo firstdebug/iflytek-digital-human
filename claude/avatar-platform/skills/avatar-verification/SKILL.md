@@ -1,15 +1,6 @@
 ---
 name: avatar-verification
 description: 项目交付前的完整验证流程。自动检测并修复常见问题，确保项目开箱即用。
-tags:
-  - verification
-  - validation
-  - quality-assurance
-priority: critical
-optional_tools:
-  - name: query-scene-config
-    when: Layer 2 凭据验证——确认 sceneId 真的已发布且具备对话能力
-    fallback: 仅做本地格式校验，提醒用户手动确认控制台已发布
 ---
 
 # avatar-verification: 交付前验证
@@ -18,19 +9,35 @@ optional_tools:
 
 在项目交付给用户前，自动执行完整的验证流程，检测并修复常见问题，确保用户拿到的是**开箱即用**的项目。
 
+先读 `../shared/delivery-modes.md`，接收上游 `workflow_mode: quick | strict`。
+
+- `quick`：执行完整验证，但只在上下文和最终回复中保留简短结果，不创建 `verification-report.md`。
+- `strict`：执行完整验证并按 `references/integration-output.md` 生成审计报告。
+
+**模式只改变报告形态，不降低验证覆盖**：`quick` 同样要跑完构建、运行、凭据安全和目标功能验证。
+只验证用户确认启用的能力——用户未选择语音时，不把麦克风权限、录音或 ASR 当作必检项。
+
+Android 构建必须读取 `../shared/android-gradle-stability.md`，串行完成在线预热与 `--offline` 复验。
+
 **调用时机**:
 - 项目代码生成完成后
 - 凭据配置完成后
 - SDK 下载完成后
-- 启动服务器之前（HARD-GATE）
+- 启动服务器之前（HARD-GATE；Web SDK 由 `web_delivery.py` 管理）
 
 ---
 
 ## 关键约束
 
-- **HARD-GATE**: 启动服务器之前必须通过验证，只有验证通过（`ready_to_deliver: true`）才交付给用户。
+- **HARD-GATE**: Web SDK 项目必须由 `tools/web_delivery.py run` 管理凭据、canonical auth 模块、服务状态和最终验证；只有状态机返回 `ready_to_deliver: true` 才交付给用户。
+- **固定端点门禁**：`WS_URL` 必须由工具写成
+  `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact`；不得询问用户、接受其他 host/path，或自行拼接控制台 URL。
+- **门禁上报由状态机负责**：退出码 2（静态阻断）和退出码 3（等待运行证据）都保持同一 workflow 为
+  `in_progress`，由 `web_delivery.py` 自动调用非终态 `report_gate`，记录 `gate/status/remaining_issues`；
+  模型不得手动调用 `report_gate`、`report_fail` 或 `report_complete` 改写状态。
 - Critical 问题未修复 → 禁止交付。
 - 能自动修复的问题优先自动修复；无法自动修复的问题必须列入 `remaining_issues` 并回退到 `avatar-troubleshoot`。
+- Web SDK 项目不得直接运行 `web_sdk_gate.py`；首次运行 `python "${CLAUDE_PLUGIN_ROOT}/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<target>"`，浏览器证据产生后重复同一命令；只有退出码 0 才能交付。
 
 ### Red Flags（最常见的交付前问题）
 
@@ -97,6 +104,10 @@ fi
 ## 验证清单 / 交接协议
 
 交付前必须确认:
+- [ ] 第一项先检查本轮浏览器证据是否出现 `avatar authentication failed`、
+  `authorization invalid`、WebSocket 1008 或 10110/10113/10114/10120/10121/11203；命中时
+  `web_sdk_gate.py` 返回 `authentication_failed`，先走
+  `avatar-troubleshoot/references/authentication-failed.md`，禁止判定完成
 - [ ] Layer 1-7 全部通过（或已自动修复）
 - [ ] 无未修复的 Critical 问题
 - [ ] `ready_to_deliver: true`
@@ -104,6 +115,29 @@ fi
 交接:
 - 验证通过 → 交付给用户（开箱即用）
 - 验证失败且无法自动修复 → 调用 `avatar-troubleshoot` 处理 `remaining_issues`
+
+---
+
+## 验证结果落盘（必做）
+
+Web SDK 的验证结论必须由确定性交付状态机落盘，模型不得手写 `ready_to_deliver: true`：
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/tools/web_delivery.py" run \
+  --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" \
+  --interaction "<text|voice|audio>"
+```
+
+- 退出码 2 / `failed`：静态门禁失败，修复后在同一 workflow 复验。
+- 退出码 3 / `needs_runtime_verification`：缺少新鲜的 `connected`、`stream_start`、首帧或目标交互浏览器证据，仍是同一 workflow。
+- 退出码 0 / `ready_to_deliver`：工具已写入新鲜的 `.runtime/verification-result.json`，才允许完成上报。
+
+`.runtime/web-runtime-evidence.json` 必须由 Playwright/浏览器验证产生，并晚于本轮源码和 SDK 变更；不能由模型按预期值手工构造。
+
+仅在状态机退出码为 0 后才会自动上报完成状态；2/3 只上报门禁，不写 `ended_at` 或 `completion_method`。
+模型不得手动调用 Reporter complete：
+
+由 `web_delivery.py` 内部调用，禁止单独执行。
 
 ---
 

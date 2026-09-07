@@ -1,447 +1,90 @@
 ---
 name: avatar-artifact-download
-description: 自动下载虚拟人 SDK（优先 OSS，失败时引导手动下载）
-tags:
-  - download
-  - sdk
-  - artifact
-priority: high
+description: 下载并校验讯飞虚拟人 Web、Android 或 iOS SDK 产物，验证压缩包、关键入口与本地清单。用于首次接入缺少 SDK、需要核对 SDK 包或禁止无 SDK 假交付时。
 ---
 
 # avatar-artifact-download: SDK 下载
 
-## 定位
+## 目标
 
-自动从腾讯云 OSS 下载虚拟人 SDK，失败时引导用户从官网手动下载。
+把目标平台的 SDK 放到项目约定目录并验证关键文件。已有完整 SDK 时直接复用；下载失败时返回明确阻塞，不猜测替代链接，也不把缺少 SDK 的项目描述成可运行。
 
-**调用时机**:
-- `avatar-preflight` Layer 1/3 检测到 SDK 缺失时（Tier 1 自动处理）
-- 用户主动请求下载 SDK
+## 输入与输出
 
----
+输入：
 
-## 核心工作流
+- `platform`：`web`、`android` 或 `ios`
+- `project_path`：目标项目根目录
+- 可选 `target_dir`：用户指定的落盘目录
 
-下载分三个阶段：
+输出状态：
 
-| Phase | 步骤 | 说明 |
-|-------|------|------|
-| 1 | 检测 SDK 状态 | 检查目标目录是否已有 SDK 文件（.aar / .framework / index.js），存在则跳过 |
-| 2 | OSS 自动下载 | 使用腾讯云 OSS 固定链接下载并解压，验证关键文件 |
-| 3 | 失败时引导手动下载 | OSS 下载失败时，给用户官网文档链接，说明手动下载步骤 |
+| 状态 | 含义 |
+|---|---|
+| `already_exists` | 关键文件已存在，未重复下载 |
+| `success` | 下载、解压和校验均通过 |
+| `blocked_missing_sdk` | 自动下载或校验失败，SDK 仍缺失，workflow 不得完成 |
+| `failed` | 文件损坏、平台不支持或目标目录不可写 |
 
-**不自动解析文档页面**：官网文档需要人工下载，无法自动获取链接。
+## 工作流
 
----
+1. 根据平台确定默认目录和验证规则。
+2. 递归检查关键文件；完整则返回 `already_exists`。
+3. Web 直接执行：`python "<plugin-root>/tools/sdk_artifact.py" ensure --platform web --project "<project>"`。
+4. 工具从内置当前配置下载到系统临时目录，验证 ZIP 并阻止路径穿越，再解压到目标目录。
+5. 按平台验证关键文件；Web 还要验证 `index.d.ts` 并生成 `.runtime/sdk-artifact.json` 的入口哈希。
+6. 检查命令退出码和 JSON 状态；不得只看 HTTP 200、控制台文字或目录非空。
+7. 非零退出时保留 `blocked_missing_sdk`，修复网络/源地址/权限后重跑同一命令。
 
-## SDK 下载配置
+## 平台规则
 
-### OSS 固定链接（腾讯云，无过期时间）
+| 平台 | 默认目录 | 必须存在 |
+|---|---|---|
+| Web | `<project>/sdk/` | `**/index.js` |
+| Android | `<project>/app/libs/` | `avatar-core-*.aar` 和 `xrtcsdk-*.aar` |
+| iOS | `<project>/Frameworks/` | `AvatarSDK.framework` |
 
-```yaml
-SDK_URLS:
-  web:
-    version: "3.2.3.1002"
-    filename: "avatar-web-sdk.zip"
-    url: "https://sdksave-1317537578.cos.ap-guangzhou.myqcloud.com/avatar-web-sdk.zip"
-    size: "~5MB"
-    verify_file: "index.js"  # 验证文件存在
-    
-  android:
-    version: "3.2.7"
-    filename: "avatar-android-sdk.zip"
-    url: "https://sdksave-1317537578.cos.ap-guangzhou.myqcloud.com/avatar-android-sdk.zip"
-    size: "~15MB"
-    verify_files: ["avatar-core-*.aar", "xrtcsdk-*.aar"]
-    
-  ios:
-    version: "3.2.1"
-    filename: "avatar-ios-sdk.zip"
-    url: "https://sdksave-1317537578.cos.ap-guangzhou.myqcloud.com/avatar-ios-sdk.zip"
-    size: "~20MB"
-    verify_file: "AvatarSDK.framework"
-```
+不要仅凭压缩包存在、HTTP 200 或目录非空判定成功。
 
-### 官网手动下载文档（OSS 失败时提供）
+## 执行策略
 
-```yaml
-MANUAL_DOWNLOAD_DOCS:
-  web:
-    url: "https://www.yuque.com/xnrpt/bbc1du/ht4a2a2vstvb13se"
-    title: "Web SDK 集成文档"
-    
-  android:
-    url: "https://www.yuque.com/xnrpt/bbc1du/nvg8cabgl4ycqvtv"
-    title: "Android SDK 集成文档"
-    
-  ios:
-    url: "https://www.yuque.com/xnrpt/bbc1du/cwqfpgdg80wfdx3u"
-    title: "iOS SDK 集成文档"
-```
+- Windows 优先使用 PowerShell；macOS/Linux 优先使用 `curl` 或 `wget`。
+- 创建目标目录和下载 SDK 属于快速接入的常规操作，可直接执行。
+- 不覆盖用户已有的同名 SDK 文件；版本不确定时先报告现状，再选择新目录或由用户明确覆盖。
+- 下载完成后以 `sdk-artifact.json` 记录相对入口、类型文件、版本和 SHA-256，供 `avatar-preflight` 与 `avatar-executing` 使用。
+- 需要现成 Bash/PowerShell 实现时读取 `references/download-scripts.md`，并按目标项目调整路径。
 
-**说明**：这些文档页面包含 SDK 下载链接，需用户手动点击下载。
+## 失败处理
 
----
+网络失败时报告具体错误类型，例如 DNS、TLS、代理、超时或 HTTP 状态。若配置中没有经过验证的替代源，不提供手动下载 URL；保持 `blocked_missing_sdk`，修复下载条件后重跑。用户自行提供 SDK 包时也必须重新执行本工具校验，不能凭文件名放行。
 
-## Phase 1: 检测 SDK 状态
+## HARD-GATE
 
-### Web SDK 检测
+- Android 必须同时有 core 与 XRTC 两个 AAR。
+- 不把 WebSocket 手写实现当作 SDK 缺失的替代方案。
+- 不把未经校验的压缩包或解压目录交给后续构建。
+- 不写死用户目录、用户名或安装缓存路径。
+- 不声称 OSS 永久有效；以实际请求和校验结果为准。
+- SDK 缺失时不得创建完成标记、调用 Reporter complete，或输出“下载后即可运行”的交付总结。
 
-```python
-def check_web_sdk(project_path):
-    """检测 Web SDK 是否已存在"""
-    # 检查常见位置
-    search_paths = [
-        f"{project_path}/sdk/**/index.js",
-        f"{project_path}/node_modules/@xfyun/avatar-sdk/index.js",
-        f"{project_path}/public/sdk/**/index.js"
-    ]
-    
-    for pattern in search_paths:
-        files = glob(pattern, recursive=True)
-        if files:
-            return {
-                "exists": True,
-                "path": os.path.dirname(files[0]),
-                "version": extract_version_from_file(files[0])
-            }
-    
-    return {"exists": False}
-```
+## References
 
-### Android SDK 检测
-
-```python
-def check_android_sdk(project_path):
-    """检测 Android SDK 是否已存在"""
-    libs_path = f"{project_path}/app/libs"
-    
-    # 检查必需的 aar 文件
-    avatar_core = glob(f"{libs_path}/avatar-core-*.aar")
-    xrtcsdk = glob(f"{libs_path}/xrtcsdk-*.aar")
-    
-    if avatar_core and xrtcsdk:
-        return {
-            "exists": True,
-            "path": libs_path,
-            "files": {
-                "avatar_core": os.path.basename(avatar_core[0]),
-                "xrtcsdk": os.path.basename(xrtcsdk[0])
-            }
-        }
-    
-    return {"exists": False}
-```
-
-### iOS SDK 检测
-
-```python
-def check_ios_sdk(project_path):
-    """检测 iOS SDK 是否已存在"""
-    search_paths = [
-        f"{project_path}/Frameworks/AvatarSDK.framework",
-        f"{project_path}/Pods/AvatarSDK/AvatarSDK.framework"
-    ]
-    
-    for path in search_paths:
-        if os.path.exists(path):
-            return {
-                "exists": True,
-                "path": os.path.dirname(path)
-            }
-    
-    return {"exists": False}
-```
-
----
-
-## Phase 2: OSS 自动下载
-
-### 通用下载函数
-
-```python
-def download_sdk_from_oss(platform, target_dir):
-    """
-    从腾讯云 OSS 下载 SDK
-    
-    Args:
-        platform: "web" / "android" / "ios"
-        target_dir: 目标解压目录
-    
-    Returns:
-        {"status": "success", "path": "...", "version": "..."}
-        或
-        {"status": "failed", "reason": "..."}
-    """
-    config = SDK_URLS[platform]
-    temp_file = f"/tmp/{config['filename']}"
-    
-    print(f"📥 正在从 OSS 下载 {platform.upper()} SDK...")
-    print(f"版本: {config['version']}")
-    print(f"大小: {config['size']}")
-    print("")
-    
-    # 下载
-    try:
-        response = requests.get(config['url'], stream=True, timeout=30)
-        response.raise_for_status()
-        
-        total_size = int(response.headers.get('content-length', 0))
-        with open(temp_file, 'wb') as f:
-            downloaded = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-                downloaded += len(chunk)
-                # 显示进度
-                percent = int(downloaded / total_size * 100) if total_size else 0
-                print(f"\r下载进度: {percent}%", end='', flush=True)
-        
-        print("\n✅ 下载完成\n")
-    
-    except requests.exceptions.RequestException as e:
-        return {
-            "status": "failed",
-            "reason": f"OSS 下载失败: {str(e)}",
-            "error_type": "network"
-        }
-    
-    # 解压
-    print("📦 正在解压 SDK...")
-    try:
-        with zipfile.ZipFile(temp_file, 'r') as zip_ref:
-            zip_ref.extractall(target_dir)
-        print("✅ 解压完成\n")
-    except Exception as e:
-        return {
-            "status": "failed",
-            "reason": f"解压失败: {str(e)}",
-            "error_type": "extraction"
-        }
-    finally:
-        # 清理临时文件
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-    
-    # 验证
-    print("🔍 验证 SDK 完整性...")
-    verify_result = verify_sdk_files(platform, target_dir, config)
-    
-    if verify_result["valid"]:
-        print("✅ SDK 验证通过\n")
-        return {
-            "status": "success",
-            "path": verify_result["sdk_path"],
-            "version": config["version"]
-        }
-    else:
-        return {
-            "status": "failed",
-            "reason": f"SDK 验证失败: {verify_result['reason']}",
-            "error_type": "verification"
-        }
-```
-
-### SDK 文件验证
-
-```python
-def verify_sdk_files(platform, target_dir, config):
-    """验证 SDK 关键文件是否存在"""
-    
-    if platform == "web":
-        # 查找 index.js
-        index_files = glob(f"{target_dir}/**/index.js", recursive=True)
-        if index_files:
-            return {"valid": True, "sdk_path": os.path.dirname(index_files[0])}
-        return {"valid": False, "reason": "未找到 index.js"}
-    
-    elif platform == "android":
-        # 查找 aar 文件
-        avatar_core = glob(f"{target_dir}/**/avatar-core-*.aar", recursive=True)
-        xrtcsdk = glob(f"{target_dir}/**/xrtcsdk-*.aar", recursive=True)
-        
-        if avatar_core and xrtcsdk:
-            return {"valid": True, "sdk_path": target_dir}
-        
-        missing = []
-        if not avatar_core:
-            missing.append("avatar-core-*.aar")
-        if not xrtcsdk:
-            missing.append("xrtcsdk-*.aar")
-        return {"valid": False, "reason": f"缺少文件: {', '.join(missing)}"}
-    
-    elif platform == "ios":
-        # 查找 framework
-        framework = glob(f"{target_dir}/**/AvatarSDK.framework", recursive=True)
-        if framework:
-            return {"valid": True, "sdk_path": os.path.dirname(framework[0])}
-        return {"valid": False, "reason": "未找到 AvatarSDK.framework"}
-    
-    return {"valid": False, "reason": "未知平台"}
-```
-
----
-
-## Phase 3: 失败时引导手动下载
-
-当 OSS 下载失败时，**不尝试自动解析文档页面**，而是给用户清晰的手动下载指引。
-
-### 失败处理函数
-
-```python
-def handle_download_failure(platform, error_result):
-    """OSS 下载失败时的处理"""
-    
-    print("❌ OSS 自动下载失败\n")
-    print(f"失败原因: {error_result['reason']}\n")
-    
-    # 根据错误类型给诊断建议
-    if error_result.get("error_type") == "network":
-        print("💡 可能原因:")
-        print("   - 网络连接问题")
-        print("   - 防火墙或代理拦截腾讯云 OSS")
-        print("   - DNS 解析失败\n")
-        print("💡 排查步骤:")
-        print("   1. 检查网络连接")
-        print("   2. 尝试浏览器访问: https://sdksave-1317537578.cos.ap-guangzhou.myqcloud.com/")
-        print("   3. 检查防火墙/代理设置\n")
-    
-    # 给手动下载指引
-    doc_config = MANUAL_DOWNLOAD_DOCS[platform]
-    
-    print("╔════════════════════════════════════════════════════════════╗")
-    print("║  请手动下载 SDK                                           ║")
-    print("╚════════════════════════════════════════════════════════════╝\n")
-    
-    print(f"📖 官方集成文档: {doc_config['title']}")
-    print(f"🔗 链接: {doc_config['url']}\n")
-    
-    print("📝 手动下载步骤:")
-    print("   1. 打开上面的文档链接")
-    print("   2. 在文档中找到「SDK 下载」章节")
-    print("   3. 点击下载链接，保存 SDK 压缩包")
-    
-    if platform == "web":
-        print("   4. 解压到项目的 sdk/ 目录")
-        print("   5. 确保 sdk/ 目录下有 index.js 文件\n")
-    elif platform == "android":
-        print("   4. 解压后，将 .aar 文件复制到 app/libs/ 目录")
-        print("   5. 应该包含：avatar-core-*.aar 和 xrtcsdk-*.aar\n")
-    elif platform == "ios":
-        print("   4. 解压后，将 .framework 文件复制到 Frameworks/ 目录")
-        print("   5. 在 Xcode 中添加 Framework 依赖\n")
-    
-    print("完成后，回来告诉我「SDK 已下载」，我会继续后续步骤。\n")
-    
-    return {
-        "status": "manual_download_required",
-        "doc_url": doc_config["url"],
-        "instructions": "用户需手动从文档页面下载 SDK"
-    }
-```
-
----
-
-## 完整执行流程
-
-```python
-def execute_sdk_download(platform, project_path):
-    """
-    执行 SDK 下载流程
-    
-    Args:
-        platform: "web" / "android" / "ios"
-        project_path: 项目根目录
-    
-    Returns:
-        下载结果（成功、失败、需手动下载）
-    """
-    
-    print(f"╔════════════════════════════════════════════════════════════╗")
-    print(f"║  {platform.upper()} SDK 下载                                    ║")
-    print(f"╚════════════════════════════════════════════════════════════╝\n")
-    
-    # Phase 1: 检测 SDK 是否已存在
-    print("🔍 检测 SDK 状态...")
-    
-    if platform == "web":
-        check_result = check_web_sdk(project_path)
-        target_dir = f"{project_path}/sdk"
-    elif platform == "android":
-        check_result = check_android_sdk(project_path)
-        target_dir = f"{project_path}/app/libs"
-    elif platform == "ios":
-        check_result = check_ios_sdk(project_path)
-        target_dir = f"{project_path}/Frameworks"
-    else:
-        return {"status": "error", "reason": f"不支持的平台: {platform}"}
-    
-    if check_result["exists"]:
-        print(f"✅ SDK 已存在")
-        print(f"路径: {check_result['path']}\n")
-        return {
-            "status": "already_exists",
-            "path": check_result["path"]
-        }
-    
-    print("SDK 不存在，开始下载...\n")
-    
-    # Phase 2: 从 OSS 下载
-    download_result = download_sdk_from_oss(platform, target_dir)
-    
-    if download_result["status"] == "success":
-        print("╔════════════════════════════════════════════════════════════╗")
-        print("║  ✅ SDK 下载完成！                                        ║")
-        print("╚════════════════════════════════════════════════════════════╝\n")
-        print(f"SDK 路径: {download_result['path']}")
-        print(f"版本: {download_result['version']}\n")
-        return download_result
-    
-    # Phase 3: 失败时引导手动下载
-    return handle_download_failure(platform, download_result)
-```
-
----
-
-## 输出格式
-
-### 成功下载
-```yaml
-status: "success"
-platform: "android"
-path: "./app/libs"
-version: "3.2.7"
-source: "oss"
-```
-
-### 已存在，跳过
-```yaml
-status: "already_exists"
-platform: "web"
-path: "./sdk/avatar-sdk-web"
-```
-
-### 需要手动下载
-```yaml
-status: "manual_download_required"
-platform: "ios"
-doc_url: "https://www.yuque.com/xnrpt/bbc1du/cwqfpgdg80wfdx3u"
-instructions: "用户需从文档页面手动下载 SDK"
-reason: "OSS 下载失败: 网络超时"
-```
-
----
+- `references/config-templates.md`：当前版本、下载地址、目标目录和验证规则
+- `references/download-scripts.md`：按需使用的 Bash 与 PowerShell 完整脚本
+- `references/integration.md`：与 preflight 的衔接和结果结构示例
 
 ## 验证清单
 
-- [ ] Phase 1 检测 SDK 是否已存在（避免重复下载）
-- [ ] Phase 2 从 OSS 下载并验证关键文件
-- [ ] Phase 3 失败时给出清晰的手动下载指引（不自动解析文档）
-- [ ] 支持 Web / Android / iOS 三个平台
-- [ ] 网络错误时提供诊断建议
+- [ ] 目标平台与目录已确定
+- [ ] 下载前已检查现有 SDK
+- [ ] 命令退出码为 0，下载、ZIP 安全检查和解压均成功
+- [ ] 平台关键文件全部存在
+- [ ] `.runtime/sdk-artifact.json` 的入口路径和哈希与磁盘一致
+- [ ] 临时文件已清理
+- [ ] 返回状态、实际路径和版本清晰
 
----
+## 相关 Skill
 
-## 相关 Skills
-
-- `avatar-preflight`: 在 Layer 1（Tier 1）调用本 skill 自动下载 SDK
-- `avatar-credentials`: 凭据获取和验证
+- `avatar-preflight`：检测 SDK 是否就绪
+- `avatar-executing`：使用已验证 SDK 构建工程
+- `avatar-credentials`：准备 SDK 初始化所需凭据

@@ -1,5 +1,5 @@
 ---
-name: avatar-text-driver
+name: text-driver
 description: 文本驱动功能实现指南
 tags:
   - feature
@@ -139,5 +139,5 @@ for (const sentence of sentences) {
 
 ## 相关技能
 
-- `avatar-text-interact`: 文本交互（经过 NLP/大模型）
-- `avatar-voice-interact`: 语音交互
+- `text-interact`: 文本交互（经过 NLP/大模型）
+- `voice-interact`: 语音交互

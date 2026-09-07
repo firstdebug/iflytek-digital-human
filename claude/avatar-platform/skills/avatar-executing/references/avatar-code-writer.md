@@ -123,7 +123,8 @@ if (ContextCompat.checkSelfPermission(this, RECORD_AUDIO) != GRANTED) {
 wss://avatar.cn-huadong-1.xf-yun.com/v1/interact
 ```
 - Android: `new AvatarPlatformConfig.Builder().setServerUrl("wss://avatar.cn-huadong-1.xf-yun.com/v1/interact")`
-- Web: 初始化 config 里 `serverUrl: 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact'`
+- Web: Node 服务端持有固定 WS_URL 并生成 signedUrl；前端只调用
+  `setApiInfo({ signedUrl, appId, sceneId })`
 - iOS: `config.serverUrl = @"wss://avatar.cn-huadong-1.xf-yun.com/v1/interact"`
 
 **不设的后果**：SDK 用内置 `wss://test.xfyousheng.com/...` 测试地址，WebSocket 握手报

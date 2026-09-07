@@ -11,30 +11,28 @@ tags:
   - avatar
 priority: high
 required_tools:
-  - name: create-knowledge-base
+  - name: xfyun_knowledge.py create-kb
     description: 创建知识库
-  - name: upload-kb-document
+  - name: xfyun_knowledge.py upload
     description: 上传文档
-  - name: enable-kb-for-scene
+  - name: xfyun_knowledge.py enable
     description: 启用知识库对话
-  - name: publish-kb-scene
-    description: 发布配置
 optional_tools:
-  - name: list-knowledge-bases
+  - name: xfyun_knowledge.py list
     description: 列出已有知识库
-  - name: list-kb-labels
+  - name: xfyun_knowledge.py labels
     description: 列出标签
-  - name: list-kb-models
+  - name: xfyun_knowledge.py models
     description: 列出可用模型
-  - name: create-kb-category
+  - name: xfyun_knowledge.py create-category
     description: 创建知识库分类（顶级或子分类）
-  - name: delete-kb-document
+  - name: xfyun_knowledge.py delete-doc
     description: 删除文档
-  - name: delete-knowledge-base
+  - name: xfyun_knowledge.py delete-kb
     description: 删除知识库
-  - name: query-scene-kb-status
+  - name: xfyun_knowledge.py status
     description: 查询场景知识库状态库状态
-  - name: query-kb-docs
+  - name: xfyun_knowledge.py docs
     description: 查询知识库文档
 ---
 
@@ -96,9 +94,9 @@ optional_tools:
 ### 完整配置流程
 
 ```
-创建知识库 → 上传文档 → 等待处理 → 关联场景 → 发布 → 测试
-     ↓           ↓          ↓         ↓        ↓       ↓
-  create-kb   upload      wait     enable   publish  对话测试
+创建知识库 → 上传文档 → 等待处理 → 关联并发布 → 验证 → 测试
+     ↓           ↓          ↓           ↓          ↓       ↓
+  create-kb   upload      --wait      enable      status  对话测试
 ```
 
 ### 1. 创建知识库
@@ -114,8 +112,8 @@ python tools/xfyun_knowledge.py create-label "产品文档"
 python tools/xfyun_knowledge.py create-kb "我的知识库" \
   --label <labelId> \
   --desc "产品使用手册" \
-  --vector bge-large-zh-v1.5 \
-  --llm xinghuo-4.0
+  --vector emb_v1_1024 \
+  --llm xhdmx1
 
 # 输出: 知识库ID (libId)
 ```
@@ -164,14 +162,14 @@ python tools/xfyun_knowledge.py docs <libId>
 
 # 输出:
 # 文档ID  名称        状态         段落数
-# 123    manual.pdf  1(成功)      58
-# 124    faq.md      0(处理中)    0
+# 123    manual.pdf  1(就绪)      58
+# 124    faq.md      -2(处理中)   0
 ```
 
 **状态说明**:
-- `0` — 处理中
-- `1` — 成功
-- `2` — 失败
+- `1` — 就绪
+- `0` / `-2` / `-4` — 处理中
+- `-3` — 采编异常
 
 ### 4. 关联场景
 
@@ -182,18 +180,18 @@ python tools/xfyun_knowledge.py enable <sceneId> <libId>
 # 为场景启用知识库对话（自有模型，如 DeepSeek）—— 必须显式指定 openai 链路
 python tools/xfyun_knowledge.py enable <sceneId> <libId> --chain docqa,openai
 
-# 这会自动:
+# `enable` 默认会自动:
 # 1. 设置调用链（默认 "docqa,xinghuo"；自有模型用 --chain docqa,openai）
 # 2. 配置 nlpExtra.domain
 # 3. 关联知识库
+# 4. 发布场景配置
 ```
 
-### 5. 发布配置
+### 5. 仅在显式延迟发布时单独发布
 
 ```bash
+# 只有此前使用 enable --no-publish，或单独执行 disable/chain 后，才需显式发布
 python tools/xfyun_knowledge.py publish <sceneId>
-
-# 必须发布后才生效！
 ```
 
 ### 6. 查询状态
@@ -277,7 +275,7 @@ python tools/xfyun_knowledge.py delete-kb <libId>
 ## 关键约束（HARD-GATE）
 
 1. **文档处理需要时间** — 上传后需等待拆分、向量化（用 `--wait` 或手动查询）
-2. **启用后必须发布** — `enable` 不会自动 `publish`，必须手动执行
+2. **启用默认自动发布** — `enable` 默认包含 `publish`；只有传入 `--no-publish` 才需稍后手动发布
 3. **场景需要对话能力** — 无 LLM 授权时 `enable` 会失败
 4. **调用链顺序影响效果** — `docqa,xinghuo` 优先知识库，`xinghuo,docqa` 优先 LLM
 5. **换模型会重置调用链** — 如果用 `avatar-model-config bind` 换模型，`nlpAssistantInfo` 会被重写为该模型的 nlpType（自有模型→`openai`），需重新 `enable` 或 `chain` 把 docqa 加回，且第二段要用新模型的 nlpType（如 `docqa,openai`）
@@ -310,11 +308,7 @@ python tools/xfyun_knowledge.py upload lib_abc123 ./FAQ.md --wait
 python tools/xfyun_knowledge.py enable 330998926062784512 lib_abc123
 # 输出: ✅ 已启用知识库对话，调用链: docqa,xinghuo
 
-# 5. 发布
-python tools/xfyun_knowledge.py publish 330998926062784512
-# 输出: ✅ 场景已发布
-
-# 6. 测试对话
+# 5. 测试对话（enable 已默认发布）
 # 用户问: "如何重置密码？"
 # 虚拟人会从 FAQ.md 中检索相关段落并生成回答
 ```
@@ -335,7 +329,6 @@ python tools/xfyun_knowledge.py docs lib_abc123
 
 # 3. 关联到新场景
 python tools/xfyun_knowledge.py enable 新场景ID lib_abc123
-python tools/xfyun_knowledge.py publish 新场景ID
 ```
 
 ### 场景 3: 更新知识库内容
@@ -438,7 +431,7 @@ python tools/xfyun_knowledge.py status <sceneId>
 - [ ] 场景具备对话能力（check 通过）
 - [ ] 知识库已关联场景（enable 执行）
 - [ ] 调用链已配置（包含 docqa）
-- [ ] 配置已发布（publish 执行）
+- [ ] 配置已发布（enable 默认发布；使用 --no-publish 时已补执行 publish）
 - [ ] 测试对话引用知识库内容
 
 ---

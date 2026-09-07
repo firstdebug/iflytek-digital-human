@@ -2,14 +2,26 @@
 讯飞虚拟人 - 密钥安全管理模块
 功能：本地加密存储、脱敏显示、交互式输入
 """
-import json
 import getpass
+import json
+import os
 from pathlib import Path
 from cryptography.fernet import Fernet
 
 
 # ==================== 配置 ====================
-SECRETS_DIR = Path.home() / ".xfyun"
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+
+
+def resolve_secrets_dir():
+    """密钥目录默认在插件根目录 .runtime/secrets，可用环境变量覆盖。"""
+    override = os.environ.get("XFYUN_AVATAR_SECRETS_DIR")
+    if override:
+        return Path(os.path.expandvars(os.path.expanduser(override))).resolve()
+    return PLUGIN_ROOT / ".runtime" / "secrets"
+
+
+SECRETS_DIR = resolve_secrets_dir()
 MASTER_KEY_FILE = SECRETS_DIR / "master.key"
 SECRETS_FILE = SECRETS_DIR / "secrets.enc"
 
@@ -25,13 +37,21 @@ def mask_secret(value, show_prefix=4, show_suffix=4):
     """
     脱敏显示：sk-1234****abcd
     只显示前后几位，中间打星号
+
+    show_prefix/show_suffix 为 0 时该侧完全不显示，绝不回退成原值。
     """
     if not value:
         return ""
+    if not isinstance(show_prefix, int) or not isinstance(show_suffix, int):
+        raise TypeError("show_prefix and show_suffix must be integers")
+    if show_prefix < 0 or show_suffix < 0:
+        raise ValueError("show_prefix and show_suffix must be non-negative")
     value_str = str(value)
     if len(value_str) <= show_prefix + show_suffix:
         return "*" * len(value_str)
-    return f"{value_str[:show_prefix]}{'*' * 8}{value_str[-show_suffix:]}"
+    prefix = value_str[:show_prefix] if show_prefix else ""
+    suffix = value_str[-show_suffix:] if show_suffix else ""
+    return f"{prefix}{'*' * 8}{suffix}"
 
 
 def mask_dict(data, depth=3):

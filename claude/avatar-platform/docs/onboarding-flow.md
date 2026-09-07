@@ -138,6 +138,11 @@
 
 ### 5B. SDK 开发(编程接入)
 
+工程文件骨架可以先按 `avatar-executing` 的平台 Playbook 创建；凭据和 SDK 是启动真实链路的门禁，
+不是创建空骨架的门禁。Web 场景下先创建 `server.js` 等最小文件，再运行 `web_delivery.py run`。
+`web_delivery.py` 不生成工程文件：缺少 `server.js` 时会先返回
+`blocked_server_lifecycle` / `server_js_missing`。
+
 1. **环境检查**(`avatar-preflight`):Node/npm 版本、防火墙、依赖安装
 2. **下载 SDK**(`avatar-artifact-download`):自动下载对应平台 SDK
 3. **工具链验证**(`toolchain`):检查构建工具(Vite/Webpack/Gradle/Xcode)

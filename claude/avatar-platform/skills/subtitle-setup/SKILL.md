@@ -1,5 +1,5 @@
 ---
-name: avatar-subtitle-setup
+name: subtitle-setup
 description: 虚拟人字幕配置和显示
 tags:
   - feature
@@ -94,6 +94,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-text-driver`: 文本驱动（字幕内容来源）
-- `avatar-transparent-bg`: 透明背景（需客户端字幕）
-- `avatar-text-interact`: 文本交互（NLP 回复字幕）
+- `text-driver`: 文本驱动（字幕内容来源）
+- `transparent-bg`: 透明背景（需客户端字幕）
+- `text-interact`: 文本交互（NLP 回复字幕）

@@ -6,11 +6,63 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/route_hint.cjs"
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/route_hint.py\"",
+            "timeout": 5
           }
         ],
         "id": "user-prompt:avatar-route",
         "description": "Detect avatar/digital-human keywords and inject routing hint to avatar-workflow-entry"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" prompt",
+            "timeout": 10
+          }
+        ],
+        "id": "telemetry:prompt",
+        "description": "Usage tracking: capture /avatar-platform:xxx slash commands and avatar keyword signal"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" pre",
+            "timeout": 5
+          }
+        ],
+        "id": "telemetry:pre-tool",
+        "description": "Usage tracking: skill.md reads"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/stop_dispatch.py\"",
+            "timeout": 30
+          }
+        ],
+        "id": "avatar-stop:guard-and-telemetry",
+        "description": "Block unsafe avatar answers and flush telemetry without duplicate Stop hooks"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/tracker.py\" end",
+            "timeout": 10
+          }
+        ],
+        "id": "telemetry:session-end",
+        "description": "Usage tracking: close dangling in_progress workflows as interrupted"
       }
     ]
   }

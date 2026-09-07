@@ -1,0 +1,10 @@
+%%{init: {"theme":"base", "themeVariables":{"background":"#ffffff", "primaryColor":"#eef2ff", "primaryTextColor":"#111827", "primaryBorderColor":"#6366f1", "lineColor":"#4b5563", "textColor":"#111827"}}}%%
+stateDiagram-v2
+    [*] --> in_progress
+    in_progress --> in_progress: prompt / Skill / tool / 中间失败
+    in_progress --> completed: SessionEnd + 有效完成证据
+    in_progress --> interrupted: SessionEnd 无完成证据
+    in_progress --> cancelled: 任务切换或用户取消
+    interrupted --> in_progress: 新会话满足接续条件
+    cancelled --> in_progress: 新任务重新开始
+    completed --> completed: 重复上报 / 旧 in_progress 到达

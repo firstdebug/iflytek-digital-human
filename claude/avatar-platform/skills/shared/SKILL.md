@@ -26,9 +26,13 @@ priority: low
 | 测试驱动开发 | `test-driven-development/SKILL.md` | 通用 TDD 工作方法（先写测试再实现） |
 | 并行分发子 agent | `dispatching-parallel-agents/SKILL.md` | 把多个独立任务并行派发给子 agent 缩短耗时 |
 | Android 分区存储适配 | `android-scoped-storage.md` | Android 11+ (API 30) 分区存储下的日志路径配置 |
+| Android Gradle 稳定构建 | `android-gradle-stability.md` | Wrapper 镜像、Maven 顺序、内存/并发、缓存锁与超时处理 |
+| 快速/严格交付模式 | `delivery-modes.md` | `workflow_mode: quick\|strict` 的选择、门禁与 token 纪律 |
 
 ## 使用建议
 
 - 需要并行处理多个独立任务 → 参考 `dispatching-parallel-agents`
 - 涉及测试策略 → 参考 `test-driven-development`
 - Android 工程遇到 `/sdcard/` 写入受限 → 参考 `android-scoped-storage.md`
+- Android 构建慢、卡住、缓存锁或 daemon 异常 → 参考 `android-gradle-stability.md`（构建、预检、排障、验收共用）
+- 首次 SDK 自建或多能力扩展要决定过程文档和评审成本 → 参考 `delivery-modes.md`

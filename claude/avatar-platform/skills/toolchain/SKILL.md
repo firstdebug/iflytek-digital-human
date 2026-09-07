@@ -57,7 +57,7 @@ priority: medium
 | platform | 参考文件 | 载荷内容 |
 |----------|----------|----------|
 | web | `references/web-checks.md` | Node.js / 包管理器 / 构建工具 / HTTPS / ESM / 浏览器 / 静态服务器 的检查项、检测实现、修复模板、状态分类 |
-| android | `references/android-checks.md` | Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查 |
+| android | `references/android-checks.md` | Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查。构建执行、超时处理和离线验收必须遵循 `../shared/android-gradle-stability.md` |
 | ios | `references/ios-checks.md` | Xcode / Deployment Target / CocoaPods / Framework / 系统库 / Build Settings / Info.plist / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查 |
 
 场景细分（在选定 platform reference 内进一步定位）：

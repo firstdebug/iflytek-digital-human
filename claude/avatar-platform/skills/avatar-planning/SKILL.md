@@ -13,6 +13,15 @@ priority: high
 
 三阶段工作流的 **Phase 2: 计划生成**，负责将设计文档转化为可执行的实现步骤。
 
+## 模式门禁
+
+先读 `../shared/delivery-modes.md`，接收上游 `workflow_mode: quick | strict`。
+
+- `workflow_mode=quick`：**直接跳过本阶段**，不要读取计划模板，不创建计划文档，不调用 plan-writer/plan-reviewer；把实施摘要直接交给 `avatar-executing`。
+- `workflow_mode=strict`：继续本流程。
+
+模式不明确时返回上游询问用户，不能默认 quick。
+
 ## 触发条件 / 调用时机
 
 - 上游 `avatar-brainstorming` 已产出设计文档 (`design-spec.md`)

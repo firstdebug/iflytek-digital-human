@@ -1,5 +1,5 @@
 ---
-name: avatar-audio-driver
+name: audio-driver
 description: 音频驱动功能实现指南（用音频数据直接驱动虚拟人口型和播报）
 tags:
   - feature
@@ -97,6 +97,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-text-driver`: 文本驱动（平台 TTS）
-- `avatar-voice-interact`: 语音交互（含音频上传）
+- `text-driver`: 文本驱动（平台 TTS）
+- `voice-interact`: 语音交互（含音频上传）
 - `avatar-troubleshoot`: 音频问题排查

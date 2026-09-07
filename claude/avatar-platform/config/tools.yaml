@@ -17,7 +17,7 @@ tools:
       uid: string           # 账号 ID (account_id)
       session: object       # requests.Session 对象
     security:
-      sensitive_output: false  # Cookie 会保存到 xfyun_cookies.json
+      sensitive_output: false  # Cookie 默认保存到插件根目录 .runtime/，可用环境变量覆盖
     required: false
 
   # ========== 服务查询 ==========
@@ -28,12 +28,12 @@ tools:
     path: tools/xfyun_query_services.py
     input: {}
     output:
-      scenes: array
+      scenes:
         - sceneName: string
-        - sceneId: string
-        - appId: string
-        - apiKey: string  # 已脱敏
-        - apiSecret: string  # 已脱敏
+          sceneId: string
+          appId: string
+          apiKey: string  # 已脱敏
+          apiSecret: string  # 已脱敏
     security:
       sensitive_output: true  # 虽然已脱敏，但仍标记为敏感
       export_file: xfyun_scenes_export.json
@@ -48,10 +48,10 @@ tools:
     command: list
     input: {}
     output:
-      models: array
+      models:
         - name: string
-        - model: string
-        - modelType: integer  # 1=官方 2=自有
+          model: string
+          modelType: integer  # 1=官方 2=自有
     security:
       sensitive_output: false
     required: false
@@ -171,7 +171,7 @@ tools:
       key_id: string
       value: string
     output:
-      saved_path: string  # ~/.xfyun/secrets.enc
+      saved_path: string  # 默认 <plugin-root>/.runtime/secrets/secrets.enc
     security:
       sensitive_input: [value]
     required: false
@@ -189,6 +189,40 @@ tools:
       sensitive_output: true
     required: false
 
+  # ========== Web SDK 交付编排 ==========
+
+  - name: web-delivery
+    description: 固定执行 Web SDK 凭据、SDK、项目专属服务、端口、浏览器证据和最终完成门禁
+    type: script
+    path: tools/web_delivery.py
+    command: run
+    input:
+      project: string
+      appId: string
+      sceneId: string
+      interaction: string
+    output:
+      status: string
+      ready_to_deliver: boolean
+      port: integer
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: websocket-auth
+    description: 生成并校验 Web SDK canonical signed URL handler，禁止模型手写 HMAC
+    type: script
+    path: tools/websocket_auth.py
+    command: install
+    input:
+      project: string
+    output:
+      module: string
+      sha256: string
+    security:
+      sensitive_output: false
+    required: false
+
   # ========== 知识库管理 ==========
 
   - name: list-knowledge-bases
@@ -201,12 +235,12 @@ tools:
       size: integer    # 每页数量，默认20
       name: string     # 可选：按名称筛选
     output:
-      items: array
+      items:
         - id: string
-        - name: string
-        - labelName: string
-        - status: integer  # 1=启用 0=禁用
-        - docCount: integer
+          name: string
+          labelName: string
+          status: integer  # 1=启用 0=禁用
+          docCount: integer
     security:
       sensitive_output: false
     required: false
@@ -218,9 +252,9 @@ tools:
     command: labels
     input: {}
     output:
-      labels: array
+      labels:
         - id: string
-        - name: string
+          name: string
     security:
       sensitive_output: false
     required: false
@@ -320,10 +354,10 @@ tools:
     input:
       libId: string
     output:
-      versions: array
+      versions:
         - version: string
-        - status: integer  # 1=生效 0=未生效
-        - docCount: integer
+          status: integer  # 1=生效 0=未生效
+          docCount: integer
     security:
       sensitive_output: false
     required: false
@@ -339,11 +373,11 @@ tools:
       page: integer
       size: integer
     output:
-      items: array
+      items:
         - id: string
-        - name: string
-        - status: integer  # 0=处理中 1=成功 2=失败
-        - chunkNum: integer  # 段落数
+          name: string
+          status: integer  # 0=处理中 1=成功 2=失败
+          chunkNum: integer  # 段落数
     security:
       sensitive_output: false
     required: false
@@ -400,9 +434,9 @@ tools:
     command: list-templates
     input: {}
     output:
-      templates: array
+      templates:
         - id: integer     # 1大屏/3Web客服/4弹窗/7H5对话/11H5通话
-        - name: string
+          name: string
     security:
       sensitive_output: false
     required: false
@@ -485,7 +519,7 @@ tools:
       appId: string
       name: string
       desc: string          # 可选
-      anchor: string        # 可选，形象ID，默认110117026
+      anchor: string        # 可选，形象ID，默认111310001
       vcn: string           # 可选，发音人，默认x4_lingxiaoqi_oral
       no-browser: boolean   # 可选
     output:
@@ -505,10 +539,10 @@ tools:
     command: list
     input: {}
     output:
-      scenes: array
+      scenes:
         - sceneId: string
-        - sceneName: string
-        - appId: string
+          sceneName: string
+          appId: string
     security:
       sensitive_output: false
     required: false

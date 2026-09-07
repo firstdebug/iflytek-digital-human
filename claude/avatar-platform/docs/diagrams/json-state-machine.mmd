@@ -1,0 +1,29 @@
+%%{init: {"theme":"base", "themeVariables":{"background":"#ffffff", "primaryColor":"#eef2ff", "primaryTextColor":"#111827", "primaryBorderColor":"#6366f1", "lineColor":"#4b5563", "textColor":"#111827", "secondaryColor":"#f8fafc", "tertiaryColor":"#eef2ff"}}}%%
+stateDiagram-v2
+    direction TB
+    [*] --> Record : 命中虚拟人信号，写入 state.json
+
+    state "JSON 状态机  state.json 一条 workflow" as Record {
+        state "status 业务状态" as Biz {
+            [*] --> in_progress
+            in_progress --> in_progress : prompt / Skill / 门禁上报
+            in_progress --> completed : 强完成证据 verification_flag
+            in_progress --> failed : terminal_failure 或显式 fail
+            in_progress --> interrupted : SessionEnd 无完成证据 / 闲置 30 分钟
+            in_progress --> cancelled : PRIMARY skill 任务类型切换
+            interrupted --> in_progress : 5 分钟内同 anonymous_id + cwd 接续
+            completed --> in_progress : sdk_integration 弱完成证据补偿
+            completed --> [*]
+            failed --> [*]
+            cancelled --> [*]
+        }
+        --
+        state "upload_status 上传状态" as Up {
+            [*] --> pending
+            pending --> pending : 网络失败 / 可重试拒绝 / 退避
+            pending --> uploaded : ACK 且 revision 匹配
+            pending --> dead_letter : 永久拒绝且 revision 匹配
+            uploaded --> pending : 业务字段变化 revision++
+            dead_letter --> pending : 业务字段变化 revision++
+        }
+    }

@@ -1,5 +1,5 @@
 ---
-name: avatar-text-interact
+name: text-interact
 description: 文本交互（NLP/大模型对话）功能实现指南
 tags:
   - feature
@@ -111,6 +111,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-text-driver`: 文本驱动（不经过 NLP）
-- `avatar-voice-interact`: 语音交互（ASR + NLP）
+- `text-driver`: 文本驱动（不经过 NLP）
+- `voice-interact`: 语音交互（ASR + NLP）
 - `avatar-brainstorming`: 会询问是否需要文本交互功能

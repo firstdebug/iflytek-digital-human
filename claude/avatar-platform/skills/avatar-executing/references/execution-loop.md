@@ -21,10 +21,9 @@ async function ensureSDKDownloaded(platform, projectPath) {
     console.log(`✓ SDK 已就绪: ${downloadResult.path}`);
   } else if (downloadResult.status === 'already_exists') {
     console.log(`✓ SDK 已存在，跳过下载`);
-  } else if (downloadResult.status === 'manual_download_required') {
-    console.error(`❌ SDK 自动下载失败，需要手动下载`);
-    console.log(`文档地址: ${downloadResult.doc_url}`);
-    throw new Error('SDK 下载失败，中止执行');
+  } else {
+    console.error(`SDK 未就绪: ${downloadResult.status}`);
+    throw new Error('blocked_missing_sdk');
   }
   
   return downloadResult;
@@ -236,13 +235,9 @@ function verifyAssetsFromProbe(codeChanges, probedAvatarId, probedVcn) {
 
 ```javascript
 if (sdkDownloadFailed) {
-  console.error('SDK 下载失败，执行中止');
-  console.log('请尝试以下操作:');
-  console.log('1. 检查网络连接');
-  console.log('2. 手动下载 SDK: ' + docUrl);
-  console.log('3. 将 SDK 文件放置到正确位置');
-  console.log('4. 重新运行 avatar-executing');
-  throw new Error('SDK 下载失败');
+  console.error('blocked_missing_sdk');
+  console.log('检查网络、下载源、目标目录权限和 sdk-artifact.json 后重试');
+  throw new Error('blocked_missing_sdk');
 }
 ```
 

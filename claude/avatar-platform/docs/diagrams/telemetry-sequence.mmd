@@ -1,0 +1,24 @@
+%%{init: {"theme":"base", "themeVariables":{"background":"#ffffff", "primaryColor":"#eef2ff", "primaryTextColor":"#111827", "primaryBorderColor":"#6366f1", "lineColor":"#4b5563", "textColor":"#111827"}}}%%
+sequenceDiagram
+    participant U as 用户/Agent
+    participant H as Claude Hook
+    participant T as tracker.py
+    participant S as JSON state.json
+    participant P as uploader.py
+    participant C as Spring Controller
+    participant V as Telemetry Service
+    participant DB as MySQL
+
+    U->>H: prompt / Skill / tool / SessionEnd
+    H->>T: JSON hook payload
+    T->>S: workflow upsert / invocation fold / revision++
+    T-->>P: 提交后异步启动
+    P->>S: collect(upload_status=pending)
+    P->>C: POST report(batch)
+    C->>V: 参数、隐私、状态、revision 校验
+    V->>DB: workflow upsert
+    V->>DB: invocation upsert
+    DB-->>V: commit
+    V-->>C: accepted IDs / rejected
+    C-->>P: ACK
+    P->>S: 仅按 id + revision 标记 upload_status=uploaded

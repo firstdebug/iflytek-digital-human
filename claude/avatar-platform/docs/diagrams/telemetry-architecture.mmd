@@ -1,0 +1,19 @@
+%%{init: {"theme":"base", "themeVariables":{"background":"#ffffff", "primaryColor":"#eef2ff", "primaryTextColor":"#111827", "primaryBorderColor":"#6366f1", "lineColor":"#4b5563", "textColor":"#111827"}}}%%
+flowchart LR
+    A[Claude Code 会话] -->|UserPromptSubmit / PreToolUse / Stop / SessionEnd| B[tracker.py]
+    B --> C[(JSON state.json)]
+    B -.提交事务后异步拉起.-> D[uploader.py 独立进程]
+    D --> E{consent / endpoint / 退避 / 单实例锁}
+    E -->|允许上传| F[POST /zs_admin/avatarTelemetry/report]
+    E -->|撤回或拒绝| G[保留本地 pending 或 dead_letter]
+    F --> H[AvatarTelemetryController]
+    H --> I[AvatarTelemetryServiceImpl]
+    I --> J{字段、隐私、状态、revision 校验}
+    J -->|合法| K[MyBatis upsert]
+    J -->|非法| L[逐条 rejected]
+    K --> M[(avatar_telemetry_workflow)]
+    K --> N[(avatar_telemetry_invocation)]
+    M --> O[统计接口]
+    N --> O
+    F -->|accepted IDs / rejected| D
+    D -->|ACK 对应 revision 更新 upload_status| C

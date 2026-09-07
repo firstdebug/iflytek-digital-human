@@ -1,5 +1,5 @@
 ---
-name: avatar-action-control
+name: action-control
 description: 虚拟人动作控制（独立动作和自动动作 AIR）
 tags:
   - feature
@@ -107,6 +107,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-text-driver`: 文本驱动（可结合动作）
-- `avatar-text-interact`: 文本交互（AIR 自动匹配）
+- `text-driver`: 文本驱动（可结合动作）
+- `text-interact`: 文本交互（AIR 自动匹配）
 - `avatar-brainstorming`: 会询问是否需要动作控制

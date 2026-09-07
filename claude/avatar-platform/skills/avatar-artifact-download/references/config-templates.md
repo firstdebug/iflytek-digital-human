@@ -1,6 +1,6 @@
-﻿# SDK 下载配置
+# SDK 下载配置
 
-## OSS 固定链接（腾讯云，无过期时间）
+## 当前 OSS 下载配置
 
 ```yaml
 SDK_URLS:
@@ -26,32 +26,13 @@ SDK_URLS:
     verify_file: "AvatarSDK.framework"
 ```
 
-✅ **所有链接均为固定 OSS 链接，无过期时间，无需定期更新**
+链接是否可用以 `sdk_artifact.py ensure` 的实际请求、ZIP 校验和 SDK 入口校验为准；不得仅凭本文档声称长期有效。
 
 ---
 
-## 官网手动下载文档（OSS 失败时提供）
+## 下载失败
 
-```yaml
-MANUAL_DOWNLOAD_DOCS:
-  web:
-    url: "https://www.yuque.com/xnrpt/bbc1du/ht4a2a2vstvb13se"
-    title: "Web SDK 集成文档"
-    
-  android:
-    url: "https://www.yuque.com/xnrpt/bbc1du/nvg8cabgl4ycqvtv"
-    title: "Android SDK 集成文档"
-    
-  ios:
-    url: "https://www.yuque.com/xnrpt/bbc1du/cwqfpgdg80wfdx3u"
-    title: "iOS SDK 集成文档"
-```
-
-**说明**：
-- OSS 链接优先使用，速度快且稳定
-- OSS 下载失败时，**不自动解析文档页面**
-- 而是引导用户打开文档链接，手动下载 SDK
-- 文档页面包含最新 SDK 下载链接，需人工操作
+返回 `blocked_missing_sdk` 并保留同一 workflow。没有经过现场验证的替代源时，不生成官网链接或手动下载说明；修复网络、权限或配置后重跑确定性校验。
 
 ---
 
@@ -100,4 +81,4 @@ MANUAL_DOWNLOAD_DOCS:
 **iOS**:
 - `**/AvatarSDK.framework` 存在
 
-验证失败视为下载不完整，需重新下载或手动下载。
+验证失败视为 SDK 缺失或不完整，不得进入完成上报。

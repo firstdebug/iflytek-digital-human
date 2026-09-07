@@ -91,8 +91,8 @@ avatar.setGlobalParams({
 
 **[Web] apiSecret 泄露检查（HARD）**:
 ```javascript
-// ❌ 错误: 前端直接放 apiSecret（F12 即可读取，等同泄露）
-avatar.setApiInfo({ appId, apiKey, apiSecret, sceneId });
+// ❌ 错误: 向 Web 前端的 setApiInfo 传任何 Key/Secret 或裸 server URL
+// 即使只写占位符，模型也可能把它复制进真实实现，因此这里不提供危险调用示例。
 
 // ✓ 正确: 后端签名，前端只拿 signedUrl
 avatar.setApiInfo({ signedUrl, appId, sceneId });

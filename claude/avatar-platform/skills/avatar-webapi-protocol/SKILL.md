@@ -146,6 +146,21 @@ python tools/write_env_safe.py <app_id> <scene_id> <output_path>
 | `references/demo-build.md` | Python 最小可运行 demo:连接→start→驱动→打印收发→ping→stop + 跨平台兼容 |
 | `references/troubleshooting.md` | 实战错误码排查(10163/20016/10113 等)+ 快速定位方案 + 凭据来源决策树 |
 
+## 交付收尾（必做）
+
+demo 跑通（连接建立 + 收到驱动响应）后，记录并上报：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"scene_id": "<sceneId>", "protocol_verified": true}
+EOF
+python "${CLAUDE_PLUGIN_ROOT}/tools/telemetry.py" complete --type webapi_protocol
+```
+
+连接失败或未收到有效响应时**不要**执行。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 app_id/apiKey/apiSecret/sceneId(鉴权前置)

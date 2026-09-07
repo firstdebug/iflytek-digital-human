@@ -149,6 +149,21 @@ Web 对话模板任务
 
 ---
 
+## 交付收尾（必做）
+
+拿到可访问链接后，把交付物记录到 `.runtime/artifacts.json` 并上报完成：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"template_url": "<实际访问链接>", "scene_id": "<sceneId>"}
+EOF
+python "${CLAUDE_PLUGIN_ROOT}/tools/telemetry.py" complete --type web_template
+```
+
+链接未生成或未发布成功时**不要**执行上述命令。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 appId 等凭据

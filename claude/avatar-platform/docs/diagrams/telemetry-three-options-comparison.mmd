@@ -1,0 +1,67 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "background": "#ffffff",
+    "primaryTextColor": "#172033",
+    "lineColor": "#667085",
+    "fontFamily": "Microsoft YaHei, Arial, sans-serif"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 36,
+    "rankSpacing": 52
+  }
+}}%%
+flowchart LR
+  subgraph P3["方案 3：SQLite Outbox（升级选项）"]
+    direction LR
+    S3["Hook / Skill 事件<br/>同意检查与脱敏"]
+    M3[("中间层：SQLite Outbox<br/>workflow 状态 + invocation<br/>pending 队列、revision、重试、死信")]
+    T3["Uploader 批量 POST<br/>按 ID + revision 处理 ACK"]
+    B3["后端<br/>校验、幂等、MySQL upsert"]
+    N3["适合高并发、完整事件历史与严格 outbox"]
+    S3 --> M3 --> T3 --> B3
+    B3 -.-> N3
+  end
+
+  subgraph P2["方案 2：Webhook + JSON 状态机（当前实现）"]
+    direction LR
+    S2["Hook / Skill 事件<br/>同意检查与脱敏"]
+    M2["中间层：JSON 状态机<br/>workflow + invocation + revision<br/>pending / ACK / retry / dead letter"]
+    T2["Uploader 异步 POST<br/>按 ID + revision 更新 JSON"]
+    B2["后端<br/>按 workflowId + revision 幂等 upsert"]
+    N2["满足当前低吞吐需求，不保留完整转换历史"]
+    S2 --> M2 --> T2 --> B2
+    B2 -.-> N2
+  end
+
+  subgraph P1["方案 1：Direct Webhook"]
+    direction LR
+    S1["Hook / Skill 事件<br/>同意检查与脱敏"]
+    M1["中间层：空<br/>仅在内存组装事件<br/>无状态、无待发送副本"]
+    T1["直接 POST Webhook<br/>当前进程即时发送"]
+    B1["后端<br/>校验、幂等、MySQL upsert"]
+    N1["进程或网络异常：未发送事件可能丢失"]
+    S1 --> M1 --> T1 --> B1
+    B1 -.-> N1
+  end
+
+  classDef source fill:#E8F1FF,stroke:#4C78A8,stroke-width:1.5px,color:#172033;
+  classDef empty fill:#F2F4F7,stroke:#98A2B3,stroke-width:2px,stroke-dasharray:5 4,color:#344054;
+  classDef json fill:#FFF3D6,stroke:#D69224,stroke-width:2px,color:#47320C;
+  classDef sqlite fill:#E4F7EC,stroke:#2E8B57,stroke-width:2px,color:#173F2A;
+  classDef transport fill:#FDEBEC,stroke:#C8555B,stroke-width:1.5px,color:#4A2022;
+  classDef backend fill:#E8F0FE,stroke:#4B67B0,stroke-width:1.5px,color:#1F2A44;
+  classDef note fill:#FFFFFF,stroke:#B8C0CC,stroke-width:1px,stroke-dasharray:3 3,color:#475467;
+
+  class S1,S2,S3 source;
+  class M1 empty;
+  class M2 json;
+  class M3 sqlite;
+  class T1,T2,T3 transport;
+  class B1,B2,B3 backend;
+  class N1,N2,N3 note;
+
+  style P1 fill:#FFFFFF,stroke:#98A2B3,stroke-width:1px
+  style P2 fill:#FFFFFF,stroke:#D69224,stroke-width:1px
+  style P3 fill:#FFFFFF,stroke:#2E8B57,stroke-width:1px

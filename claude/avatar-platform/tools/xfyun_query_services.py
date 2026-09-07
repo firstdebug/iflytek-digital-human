@@ -13,131 +13,32 @@ if sys.platform == "win32":
         pass  # Python < 3.7 无 reconfigure，忽略
 
 import json
-import time
 import requests
 from pathlib import Path
 from typing import Optional
-from playwright.sync_api import sync_playwright, BrowserContext
+import xfyun_common as xc
+import xfyun_secrets as xs
 
 
 # ==================== 密钥脱敏工具 ====================
 def mask_secret(value, show_prefix=4, show_suffix=4):
     """脱敏显示：只显示前后几位"""
-    if not value or value == "未找到":
+    if value == "未找到":
         return value
-    value_str = str(value)
-    if len(value_str) <= show_prefix + show_suffix:
-        return "*" * len(value_str)
-    return f"{value_str[:show_prefix]}{'*' * 8}{value_str[-show_suffix:]}"
+    return xs.mask_secret(value, show_prefix=show_prefix, show_suffix=show_suffix)
 
 
 def mask_dict(data, depth=3):
     """递归脱敏字典中的敏感字段（apiKey/apiSecret/apiUrl）"""
-    if depth <= 0 or not isinstance(data, dict):
-        return data
-
-    sensitive_fields = {"apikey", "apisecret", "apiurl", "api_key", "api_secret"}
-    masked = {}
-    for key, value in data.items():
-        key_lower = str(key).lower()
-        if key_lower in sensitive_fields:
-            masked[key] = mask_secret(value)
-        elif isinstance(value, dict):
-            masked[key] = mask_dict(value, depth - 1)
-        elif isinstance(value, list):
-            masked[key] = [mask_dict(item, depth - 1) if isinstance(item, dict) else item
-                          for item in value]
-        else:
-            masked[key] = value
-    return masked
-
-# ==================== 配置区 ====================
-LOGIN_URL = "https://passport.xfyun.cn/login"
-COOKIE_FILE = Path("xfyun_cookies.json")
-LOGIN_TIMEOUT = 300
+    return xs.mask_dict(data, depth=depth)
 
 # API 端点
 API_SCENE_QUERY = "https://virtual-man.xfyun.cn/zs_web/scene/query"
 API_APP_QUERY = "https://virtual-man.xfyun.cn/zs_web/app/query"
 
-REQUIRED_COOKIES = ["ssoSessionId", "account_id"]
-
-
-# ==================== Cookie 管理（复用登录逻辑）====================
-def save_cookies(cookie_dict: dict):
-    COOKIE_FILE.write_text(json.dumps(cookie_dict, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("[OK] Cookie 已保存")
-
-
-def load_cookies() -> Optional[dict]:
-    if not COOKIE_FILE.exists():
-        return None
-    try:
-        cookie_dict = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
-        if all(name in cookie_dict for name in REQUIRED_COOKIES):
-            print("[OK] 已加载本地 Cookie")
-            return cookie_dict
-    except:
-        pass
-    return None
-
-
-def build_session(cookie_dict: dict) -> requests.Session:
-    """构建带 Cookie 的 requests 会话"""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/json",
-        "Referer": "https://www.xfyun.cn/"
-    })
-    for name, value in cookie_dict.items():
-        session.cookies.set(name, value, domain=".xfyun.cn")
-    return session
-
-
-def wait_for_login(context: BrowserContext, timeout: int) -> Optional[dict]:
-    print(f"[等待] 请在浏览器完成登录，超时 {timeout} 秒...")
-    start = time.time()
-    while time.time() - start < timeout:
-        found = {}
-        for c in context.cookies():
-            if c["name"] in REQUIRED_COOKIES:
-                found[c["name"]] = c["value"]
-        if all(name in found for name in REQUIRED_COOKIES):
-            print("[OK] 登录成功！")
-            return found
-        time.sleep(1)
-    print("[错误] 登录超时")
-    return None
-
-
-def do_browser_login() -> Optional[dict]:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context(viewport={"width": 1280, "height": 800})
-        try:
-            page = context.new_page()
-            page.goto(LOGIN_URL)
-            print(f"[浏览器] 已打开登录页面")
-            return wait_for_login(context, LOGIN_TIMEOUT)
-        finally:
-            time.sleep(1)
-            browser.close()
-
-
 def ensure_login() -> Optional[requests.Session]:
     """确保已登录，返回带 Cookie 的 session"""
-    cookie_dict = load_cookies()
-
-    # 如果没有本地 Cookie，执行登录
-    if not cookie_dict:
-        print("[启动] 需要登录，启动浏览器...")
-        cookie_dict = do_browser_login()
-        if not cookie_dict:
-            return None
-        save_cookies(cookie_dict)
-
-    return build_session(cookie_dict)
+    return xc.get_session()
 
 
 # ==================== 业务接口查询 ====================
@@ -147,68 +48,30 @@ def query_scenes(session: requests.Session):
     print("[查询] 场景列表...")
     print("="*60)
 
-    try:
-        resp = session.post(API_SCENE_QUERY, json={
-            "sceneType": 1,
-            "sceneStatus": 1,
-            "sceneTypeList": None,
-            "__times": 0
-        }, timeout=10)
-
-        print(f"[HTTP] 状态码: {resp.status_code}")
-
-        if resp.status_code != 200:
-            print(f"[错误] 请求失败: {resp.text}")
-            return None
-
-        data = resp.json()
-
-        # 检查是否登录失效
-        if data.get("code") == 80000:
-            print("[警告] 登录已失效，请删除 xfyun_cookies.json 后重新运行")
-            return None
-
-        if data.get("flag") != True:
-            print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
-            return None
-
-        scenes = data.get("data", [])
-        print(f"[OK] 查询成功，共找到 {len(scenes)} 个场景\n")
-
-        return scenes
-
-    except Exception as e:
-        print(f"[错误] 请求异常: {e}")
+    data = xc.post(session, API_SCENE_QUERY, {
+        "sceneType": 1,
+        "sceneStatus": 1,
+        "sceneTypeList": None,
+        "__times": 0,
+    })
+    if not data:
         return None
+    if data.get("flag") is not True:
+        print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
+        return None
+    scenes = data.get("data", [])
+    print(f"[OK] 查询成功，共找到 {len(scenes)} 个场景\n")
+    return scenes
 
 
 def query_app_detail(session: requests.Session, app_id: str, debug=False):
     """查询指定 appId 的详细信息"""
-    try:
-        resp = session.post(API_APP_QUERY, json={
-            "appId": app_id
-        }, timeout=10)
-
-        if resp.status_code != 200:
-            return None
-
-        data = resp.json()
-
-        # 调试模式：打印脱敏后的返回
-        if debug:
-            print(f"\n[调试] app/query 返回数据:")
-            print(json.dumps(mask_dict(data), ensure_ascii=False, indent=2))
-
-        if data.get("flag") == True:
-            # 数据在 data.records 数组里
-            records = data.get("data", {}).get("records", [])
-            if records:
-                return records[0]  # 返回第一条记录
-        return None
-
-    except Exception as e:
-        print(f"[警告] 查询 {app_id} 失败: {e}")
-        return None
+    data = xc.post(session, API_APP_QUERY, {"appId": app_id}, debug=debug)
+    if data and data.get("flag") is True:
+        records = data.get("data", {}).get("records", [])
+        if records:
+            return records[0]
+    return None
 
 
 def display_scenes(scenes: list, session: requests.Session):
@@ -290,33 +153,15 @@ def query_all_apps(session: requests.Session):
     print("[查询] 所有应用列表...")
     print("="*60)
 
-    try:
-        resp = session.post(API_APP_QUERY, json={
-            "current": 1,
-            "size": 100
-        }, timeout=10)
-
-        if resp.status_code != 200:
-            print(f"[错误] 请求失败: {resp.text}")
-            return None
-
-        data = resp.json()
-
-        if data.get("code") == 80000:
-            print("[警告] 登录已失效，请删除 xfyun_cookies.json 后重新运行")
-            return None
-
-        if data.get("flag") != True:
-            print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
-            return None
-
-        apps = data.get("data", {}).get("records", [])
-        print(f"[OK] 查询成功，共找到 {len(apps)} 个应用\n")
-        return apps
-
-    except Exception as e:
-        print(f"[错误] 请求异常: {e}")
+    data = xc.post(session, API_APP_QUERY, {"current": 1, "size": 100})
+    if not data:
         return None
+    if data.get("flag") is not True:
+        print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
+        return None
+    apps = data.get("data", {}).get("records", [])
+    print(f"[OK] 查询成功，共找到 {len(apps)} 个应用\n")
+    return apps
 
 
 # 能力判断（authKey → 网页产品名）

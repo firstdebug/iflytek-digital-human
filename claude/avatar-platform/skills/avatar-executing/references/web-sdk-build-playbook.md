@@ -3,7 +3,7 @@
 > **适用**：用户要求"用 SDK 自建 Web 虚拟人工程"（非官方模板、非直播）。
 > **原则**：本文件是 Web SDK 自建工程的**唯一权威落地流程**。按此流程生成的代码必须**一次运行成功**，
 > 不允许"先生成、再靠报错逐个打补丁"。所有字段值来自 SDK 反编译核对（v3.2.3.1002）与
-> `avatar-webapi-protocol/references/protocols.md`，不允许凭 SDK 的 `index.d.ts` 类型定义猜测。
+> `avatar-webapi-protocol/references/protocols.md`。`index.d.ts` 是导出方式和方法签名的权威来源；协议载荷字段仍以本 Playbook 和协议文档为准，不能互相替代。
 
 ---
 
@@ -51,7 +51,8 @@ Web 工程**必须**是"Node 后端 + 静态前端"，**禁止**纯静态页面�
 
 ```
 project/
-├── server.js          # Node/Express：① 服务端 HMAC 签名 ② 托管静态资源 ③ 下发非敏感配置
+├── server.js          # Node/Express：挂载 canonical handler、托管静态资源
+├── xfyun-auth.mjs     # 由 websocket_auth.py 生成并校验哈希；读取 env、生成 signedUrl
 ├── package.json       # type:module, 依赖 express + dotenv
 ├── .env               # 凭据（必须进 .gitignore）
 ├── .gitignore         # 必含 .env / node_modules
@@ -64,6 +65,20 @@ project/
 
 **理由**：`apiSecret` 一旦进前端 bundle，任何人 F12 就能拿到，等同泄露。服务端签名后前端只持有
 一次性 `signedUrl`（会话级有效），是唯一合规做法。详见 `rules/avatar-domain/sdk-conventions.md` 安全约束。
+
+**签名实现禁止手写**。`web_delivery.py` 会调用 `websocket_auth.py install` 生成 canonical 模块。
+`server.js` 只保留以下挂载，不得出现 `createHmac()` 或自行拼 authorization：
+
+```javascript
+import { avatarAuthHandler, avatarConfigHandler } from './xfyun-auth.mjs';
+
+app.get('/api/config', avatarConfigHandler);
+app.get('/api/avatar-auth', avatarAuthHandler);
+```
+
+模块从 dotenv 已加载的 `process.env` 读取 `APP_ID/API_KEY/API_SECRET/SCENE_ID/AVATAR_ID/VCN/WS_URL`；
+Key 和 Secret 必须都是完整 32 位，`WS_URL` 必须是 `wss://.../v1/interact`。最终 gate 会按 `.env`
+中的 Secret 重新计算 HMAC，并核对 signed URL 的 host、path、date、headers 和 signature。
 
 ---
 
@@ -79,6 +94,25 @@ project/
 | 6 | 启动 + 浏览器端到端验证 | 连接成功、首帧渲染 | 见 §5 验证清单 |
 
 **HARD-GATE**：Step 4 生成的 `setGlobalParams` **必须**逐项对照 §3 锁定表，不允许自由发挥字段结构。
+
+Step 1-2 必须由确定性编排器执行并检查退出码，不能改写成手动下载说明：
+
+运行前主 agent 必须先 Read `../../avatar-credentials/SKILL.md`、`../../avatar-artifact-download/SKILL.md` 和
+`../../avatar-network-debug/references/auth-verification.md`。这些是实际 Skill/参考读取，不能用状态机内部的 Python 调用冒充 invocation。
+
+```bash
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<text|voice|audio>"
+```
+
+返回 `blocked_missing_sdk` 或其它非零退出码时，保持当前 workflow 进行中并修复确定性阻塞；不得继续宣称项目完成。下载后先读实际 `esm/index.d.ts`，确认默认导出与方法签名：
+
+```javascript
+const module = await import(sdkUrl);
+const AvatarPlatform = module.default;
+const { SDKEvents, PlayerEvents } = module;
+```
+
+禁止把 `AvatarPlatform` 当具名导出，也禁止使用类型文件中不存在的 `setServerUrl()`、`getPlayer()` 等调用。
 
 ---
 
@@ -151,6 +185,8 @@ avatar.setGlobalParams({
 **必须监听的 4 个事件**（缺一不可）：`connected` / `error` / `disconnected` / `stream_start`。
 **必须处理**浏览器自动播放限制：监听 `PlayerEvents.playNotAllowed`，引导用户点击后 `player.resume()`。
 
+服务端签名格式仍以 `../../avatar-network-debug/references/auth-verification.md` 为准，但实现只允许使用 canonical `xfyun-auth.mjs`。修改路由后立即运行 `node --check server.js`，不能在未启动检查的情况下继续。
+
 ---
 
 ## 5. 端到端验证清单（Step 6 — 全绿才算完成）
@@ -163,6 +199,7 @@ avatar.setGlobalParams({
 [ ] 前端 bundle 中 grep 不到 apiSecret（安全验证）
 
 浏览器（localhost 或 HTTPS）：
+[ ] 第一项先查本轮证据无 avatar authentication failed / authorization invalid / 1008 / 10110 / 10113 / 10114 / 10120 / 10121 / 11203
 [ ] 点击启动 → 收到 SDKEvents.connected
 [ ] 收到 SDKEvents.stream_start（云端推流）
 [ ] 播放器首帧渲染（PlayerEvents.play/playing）
@@ -172,6 +209,17 @@ avatar.setGlobalParams({
 ```
 
 **若任一项失败**：先查 §0 根因表和 §3 锁定表，**不要**盲目改字段试错。
+
+浏览器测试必须把本轮真实事件写入 `.runtime/web-runtime-evidence.json`，至少包含 `source=playwright|browser`、`connected`、`stream_start`、`first_frame`、目标交互与错误列表；不得手写通过值。完成后再次运行同一个 `web_delivery.py run` 命令，状态机内部才允许执行最终 gate 和完成上报：
+
+```bash
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --interaction "<text|voice|audio>"
+```
+
+命中上述鉴权拒绝时，即使 `connected`、首帧或交互字段为 true，最终门禁也必须先返回
+`authentication_failed`，执行 `avatar-troubleshoot/references/authentication-failed.md`，不得进入完成状态。
+
+退出码 2 表示阻塞，3 表示 `needs_runtime_verification`，0 才表示 `ready_to_deliver`。Quick 与 Strict 都执行；Quick 只省略过程文档和常规 reviewer。模型不得手写运行证据、直接调用 gate 或直接调用 `telemetry.py complete`。
 
 ---
 

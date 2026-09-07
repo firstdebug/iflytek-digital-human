@@ -82,7 +82,7 @@ env.write_text('\n'.join(new_lines) + '\n')
 
 **推荐**：使用工具自动生成的默认配置
 ```bash
-cd "${CLAUDE_PLUGIN_ROOT}"
+cd <plugin-root>
 python tools/write_env_safe.py <app_id> <scene_id> ~/.env
 # 工具会自动设置通用默认值：
 # XF_AVATAR_ID=111310001
@@ -105,7 +105,7 @@ python tools/write_env_safe.py <app_id> <scene_id> ~/.env
 ```
 需要 WebAPI 凭据？
 ├─ Step 1: 登录平台
-│         cd "${CLAUDE_PLUGIN_ROOT}"
+│         cd <plugin-root>
 │         python tools/xfyun_common.py login
 │
 ├─ Step 2: 查询场景列表
@@ -136,17 +136,17 @@ python tools/xfyun_query_services.py
 ### 解决
 ```bash
 # ✓ 正确：先 cd 到插件根目录
-cd "${CLAUDE_PLUGIN_ROOT}"
+cd <plugin-root>
 python tools/xfyun_query_services.py
 
 # ❌ 错误：在其他目录直接调用
 cd ~/some-project
-python ~/.claude/plugins/.../tools/xfyun_query_services.py  # 相对导入会失败
+python <plugin-root>/tools/xfyun_query_services.py  # 直接按脚本路径运行可能导致相对导入失败
 ```
 
 **关键教训**：
 - 所有 `tools/*.py` 脚本必须在插件根目录执行
-- 执行前务必 `cd "${CLAUDE_PLUGIN_ROOT}"`
+- 执行前务必 `cd <plugin-root>`
 
 ---
 
@@ -190,13 +190,13 @@ cat ~/.env | grep -E "XF_.*=$"
 
 ### 检查登录状态
 ```bash
-cd "${CLAUDE_PLUGIN_ROOT}"
-ls tools/xfyun_cookies.json && echo "Cookie 存在" || echo "需要登录"
+cd <plugin-root>
+python tools/xfyun_common.py cookie-path
 ```
 
 ### 验证 API 调用
 ```bash
-cd "${CLAUDE_PLUGIN_ROOT}"
+cd <plugin-root>
 python tools/xfyun_query_services.py 2>&1 | head -20
 # 如果看到 "查询成功" → 登录有效
 # 如果看到 "需要登录" → 运行 python tools/xfyun_common.py login
@@ -206,10 +206,8 @@ python tools/xfyun_query_services.py 2>&1 | head -20
 
 ## 错误码完整参考
 
-更多错误码及其含义，见讯飞官方文档：
-https://www.xfyun.cn/doc/avatar/
-
 常见错误码：
 - **10xxx**：会话/协议类错误
 - **11xxx**：授权/配额类错误
 - **20xxx**：参数/资源类错误
+

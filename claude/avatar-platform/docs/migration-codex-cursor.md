@@ -31,7 +31,7 @@ Codex / Cursor 的运行环境不保证有 Python3 或这些库。若目标环�
 
 ### 2. Hooks 自动路由会失效（降级项）
 
-`hooks/hooks.json` 注册了一个 `UserPromptSubmit` 钩子：每次用户发消息时运行 `hooks/route_hint.cjs`，检测"虚拟人/数字人"等关键词，自动把请求导向入口 skill `avatar-workflow-entry`。
+`hooks/hooks.json` 注册了一个 `UserPromptSubmit` 钩子：每次用户发消息时运行 `hooks/route_hint.py`，检测"虚拟人/数字人"等关键词，自动把请求导向入口 skill `avatar-workflow-entry`，并把本地授权状态注入上下文，避免模型重复执行状态检查命令。
 
 这是 **Claude Code 独有机制**，Codex / Cursor 没有对应的 `UserPromptSubmit` 概念。转换后：
 

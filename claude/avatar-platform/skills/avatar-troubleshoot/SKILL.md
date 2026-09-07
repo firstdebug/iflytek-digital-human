@@ -1,6 +1,6 @@
 ---
 name: avatar-troubleshoot
-description: 虚拟人集成故障排查和诊断
+description: 虚拟人集成故障诊断与修复。用于错误码、黑屏、连接失败，以及 avatar authentication failed、authorization invalid、WebSocket 1008 等运行时鉴权问题。
 tags:
   - troubleshooting
   - debugging
@@ -63,8 +63,16 @@ Step 6: 验证修复
 - **准备输出修复方案** → references/fix-plan.md
 - **修复后需要验证** → references/fix-verification.md
 - **需要标准输出结构（diagnosed / needs_more_info / unable_to_diagnose）** → references/output-formats.md
+- **`avatar authentication failed` / `authorization invalid` / 1008 / 10110 / 10113 / 10114 / 10120 / 10121** →
+  必须读 `references/authentication-failed.md` 并执行其中的证据驱动恢复流程
+- **Android Gradle 构建卡住 / 超时 / 缓存锁 / daemon 异常 / 下载慢** → `../shared/android-gradle-stability.md`
 
 分析策略：**有错误码**直接查错误码库（Step 2）；**无错误码**走症状匹配 + 逐步排查（Step 3 → Step 4）。
+
+Android 构建类故障必须按 `../shared/android-gradle-stability.md` 的「卡住诊断」和「超时后的强制流程」
+处理：命令超时先检查原 Gradle/Java 进程并续接，禁止立即重复运行；禁止无依据执行
+`clean --refresh-dependencies`、禁止递归删除全局 Gradle 缓存、禁止用杀死全部 Java 进程代替定位
+具体 daemon。
 
 ---
 
@@ -80,7 +88,8 @@ Step 6: 验证修复
 
 Web 运行时高频坑（写代码时提前规避，详见运行时案例 reference）：
 
-1. **sceneId 必须已发布** —— 控制台点击"发布"按钮，否则报 `authentication failed` 或错误码 10121
+1. **鉴权失败不能只凭通用文案定因** —— scene 未发布、凭据错配、资源未授权、签名过期等都可能表现为
+   `authentication failed`；必须按 `references/authentication-failed.md` 取得平台或关闭码证据
 2. **bitrate 必须 ≥ 200** —— 数字类型，推荐 2000
 3. **NLP answer 是对象** —— 取 `data.answer.displayContent`，不要直接拼接
 4. **流式 NLP 是累积内容** —— 复用同一消息框更新，不要每帧新建
@@ -148,7 +157,7 @@ Web 运行时高频坑（写代码时提前规避，详见运行时案例 refere
 
 | 现象 / 错误 | 严重度 | 详解 |
 |------------|--------|------|
-| `avatar authentication failed`（多因 sceneId 未发布） | Critical | references/authentication-failed.md |
+| `avatar authentication failed` / 1008（通用鉴权失败，必须取证后定因） | Critical | references/authentication-failed.md |
 | `bitrate value must be larger or equal than 200` | Critical | references/bitrate-and-sdk.md |
 | `Failed to fetch dynamically imported module`（SDK esm 路径） | High | references/bitrate-and-sdk.md |
 | 有视频无声音 / `playNotAllowed`（自动播放限制） | Medium | references/bitrate-and-sdk.md |
@@ -161,22 +170,19 @@ Web 运行时高频坑（写代码时提前规避，详见运行时案例 refere
 
 ## 工具增强（authentication failed 自动诊断 + 修复）
 
-头号运行时问题 `avatar authentication failed` 的最常见根因是**场景没 publish**（错误码 10121）。
-若用户提供了 `xfyun-tools`（见 `config/tools.yaml`），可直接查+修，不用手动去控制台：
+`avatar authentication failed` 是通用错误文案，不等于“场景没 publish”。若存在平台工具，先只读查询
+app/scene 归属、类型、发布状态和资源授权，再按已确认根因执行单项修复：
 
 ```bash
-if [ -f tools/xfyun_model_manage.py ]; then
-    # 1. 查发布状态与配置
-    python tools/xfyun_model_manage.py query <sceneId>
-
-    # 2. 确认未发布 → 一键发布修复
-    python tools/xfyun_model_manage.py publish <sceneId>
-    # → 发布后 sceneId 状态变"已发布"，鉴权失败随之解决
-fi
+python tools/xfyun_query_services.py list-apps
+python tools/xfyun_query_services.py list-scenes
+python tools/xfyun_model_manage.py check <sceneId>
+python tools/xfyun_model_manage.py query-interact <sceneId>
 ```
 
-**Fallback**: 无工具时，指引用户去控制台 `virtual-man.xfyun.cn` 手动点击"发布"。
-详细诊断流程见 `references/authentication-failed.md`。
+只有平台查询明确确认未发布时才运行 `publish`；scene 不存在/归属错误时走 `xfyun_interface.py create`；
+资产未授权时走 `xfyun_interface.py auth-avatar`。平台写操作需在用户修复授权范围内执行。完整命令、权限边界、
+复验和停止条件见 `references/authentication-failed.md`。
 
 ---
 
@@ -196,6 +202,24 @@ fi
 | references/bitrate-and-sdk.md | 运行时案例 1/3/4：bitrate、SDK esm 路径、自动播放的诊断+修复代码 |
 | references/nlp-display.md | 运行时案例 2/5：NLP [object Object]、流式刷屏的完整方案 |
 | references/runtime-check.md | runtimeCheck() 自检函数 + avatar-verification Layer 7 集成 |
+
+---
+
+## 排障收尾（条件上报）
+
+问题确认解决后上报，但**仅在以下条件全部满足时**：
+
+1. 本次对话的**原始诉求就是排障**（用户一开头就是报错/黑屏/错误码），
+   而不是在 SDK 集成、模板创建等流程中途顺带修的问题
+2. 问题已实际验证修复（重跑复现步骤不再出错），不是只给了建议
+3. 本次未由 `avatar-verification` 或其他终局 skill 上报过完成
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/tools/telemetry.py" complete --type troubleshoot
+```
+
+不满足任一条 → **不要**执行。集成流程中途的排障由该流程自己的终局 skill 上报，
+在此重复上报会导致同一工作流被计两次。
 
 ---
 

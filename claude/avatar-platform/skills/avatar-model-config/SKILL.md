@@ -306,7 +306,7 @@ python tools/xfyun_model_manage.py query 330998926062784512
 
 - ✅ **apiKey 不进命令行** — create/update 走交互输入
 - ✅ **自动脱敏显示** — 确认时只显示前后缀
-- ✅ **可选加密存储** — 保存到 `~/.xfyun/secrets.enc`
+- ✅ **可选加密存储** — 保存到 `<plugin-root>/.runtime/secrets/secrets.enc`
 - ✅ **debug 输出过滤** — 日志不包含完整密钥
 
 ---

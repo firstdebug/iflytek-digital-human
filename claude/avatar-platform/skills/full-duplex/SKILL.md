@@ -1,5 +1,5 @@
 ---
-name: avatar-full-duplex
+name: full-duplex
 description: 全双工语音交互和打断功能
 tags:
   - feature
@@ -107,6 +107,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-voice-interact`: 语音交互（短语音模式）
-- `avatar-text-interact`: 文本交互（NLP）
+- `voice-interact`: 语音交互（短语音模式）
+- `text-interact`: 文本交互（NLP）
 - `avatar-permissions-setup`: 麦克风权限配置

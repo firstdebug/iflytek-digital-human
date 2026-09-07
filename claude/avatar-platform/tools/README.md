@@ -128,13 +128,13 @@ data = xc.post(session, "https://virtual-man.xfyun.cn/zs_web/scene/query", {
 | 常量 | 默认值 | 说明 |
 |------|--------|------|
 | `LOGIN_URL` | passport.xfyun.cn/login | 登录页地址 |
-| `COOKIE_FILE` | xfyun_cookies.json | Cookie 存储文件 |
+| `COOKIE_FILE` | `<plugin-root>/.runtime/xfyun_cookies.json` | Cookie 存储文件，可用环境变量覆盖 |
 | `LOGIN_TIMEOUT` | 300 | 登录超时（秒） |
 | `REQUIRED_COOKIES` | [ssoSessionId, account_id] | 必需的 Cookie |
 
 #### 注意事项
 
-- **80000 错误处理**：`post`/`get`/`put` 检测到 `code=80000` 会提示登录失效并返回 None
+- **80000 错误处理**：公共 HTTP 封装检测到 `code=80000` 会清除本地 Cookie，提示重新运行并返回 None；不会自动弹出登录页
 - **debug 脱敏**：`debug=True` 时会自动脱敏 apiKey/apiSecret/apiUrl 等字段
 - **超时**：所有请求默认 15 秒超时
 
@@ -176,8 +176,8 @@ base_url, baseurl, token, password, secret
 
 | 文件 | 权限 | 说明 |
 |------|------|------|
-| `~/.xfyun/master.key` | 600 | 主密钥（Fernet），解密用 |
-| `~/.xfyun/secrets.enc` | 600 | 加密的密钥数据（JSON） |
+| `<plugin-root>/.runtime/secrets/master.key` | 600 | 主密钥（Fernet），解密用 |
+| `<plugin-root>/.runtime/secrets/secrets.enc` | 600 | 加密的密钥数据（JSON） |
 
 **警告：** `master.key` 是解密所有密钥的万能钥匙，不要泄露或上传。丢失后加密的密钥无法恢复。
 
@@ -825,7 +825,7 @@ with open('密钥待填写.txt', 'w', encoding='utf-8') as f:
 ### 安全要点
 
 1. 所有查询输出、导出文件**自动脱敏**
-2. 密钥**加密存储**在 `~/.xfyun/`，不落明文
+2. 密钥**加密存储**在 `<plugin-root>/.runtime/secrets/`，不落明文
 3. `create`/`update` 不接受命令行传 apiKey，走交互输入
 4. debug 输出自动过滤敏感字段
 5. 完整密钥只存在于加密文件和内存中，不进入日志
@@ -836,7 +836,7 @@ with open('密钥待填写.txt', 'w', encoding='utf-8') as f:
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| 返回 code=80000 | 登录失效或 Cookie 域不对 | 删除 xfyun_cookies.json 重新登录 |
+| 返回 code=80000 | 登录失效或 Cookie 域不对 | 工具会清除本地 Cookie；重新运行取凭据流程完成登录 |
 | bind 被拒绝 | app 无对话能力 | 用 caps 查授权，换有能力的场景 |
 | 配置不生效 | 忘记 publish | 运行 publish <sceneId> |
 | 更新模型返回 method not supported | 用了 POST | model/info 必须用 PUT |

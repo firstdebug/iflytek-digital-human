@@ -1,5 +1,5 @@
 ---
-name: avatar-voice-interact
+name: voice-interact
 description: 语音交互功能实现指南
 tags:
   - feature
@@ -21,6 +21,31 @@ tags:
 ## 调用时机
 
 当需要实现「用户说话 → 虚拟人识别 → 理解并回答」的语音问答链路时使用本技能，包括语音客服、智能问答等场景。
+
+---
+
+## 用户确认门禁（HARD-GATE）
+
+语音能力会新增麦克风权限、录音采集和运行时授权流程。**开始写代码或改权限前必须先用
+`AskUserQuestion` 问用户确认**，同时确认交互方式：
+
+| 选项 | 说明 |
+|------|------|
+| 按住说话 | 按下录音、松开结束，最简单可靠 |
+| 点击开始/停止 | 点击切换录音状态，适合长问句 |
+| 自动 VAD | 静音检测自动断句，无需手动操作 |
+| 全双工实时对话 | 持续拾音 + 可打断，改用 `full-duplex` |
+
+规则：
+
+- 仅当用户在**当前任务**中明确确认后才继续。用户只说"加语音识别吧""顺便加语音"也要先问一次形态。
+- 得到"确认 / 就按住说话 / 开始加"等明确答复后，才修改 AndroidManifest.xml、Info.plist、
+  浏览器权限、录音代码或语音 UI。
+- 用户未确认前**不得**加入 `RECORD_AUDIO`、不得申请麦克风权限、不得写录音代码或语音 UI。
+- 用户只要求文本对话时，不得自行添加语音功能——改用 `text-interact`。
+- 本门禁独立于交付模式门禁，即使 `workflow_mode` 已确定也要单独问语音。
+
+完整门禁规则见 `../shared/delivery-modes.md`。
 
 ---
 
@@ -99,6 +124,6 @@ tags:
 
 ## 相关技能
 
-- `avatar-text-driver`: 文本驱动
-- `avatar-text-interact`: 文本交互
+- `text-driver`: 文本驱动
+- `text-interact`: 文本交互
 - `avatar-permissions-setup`: 权限配置

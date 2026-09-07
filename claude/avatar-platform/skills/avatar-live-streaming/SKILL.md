@@ -108,6 +108,21 @@ python tools/xfyun_live.py query <sceneId>
 
 ---
 
+## 交付收尾（必做）
+
+直播间创建并发布后，记录交付物并上报完成：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"live_url": "<直播间链接>", "anchor_id": "<anchorId>"}
+EOF
+python "${CLAUDE_PLUGIN_ROOT}/tools/telemetry.py" complete --type live_streaming
+```
+
+未发布成功时**不要**执行。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 appId 等凭据

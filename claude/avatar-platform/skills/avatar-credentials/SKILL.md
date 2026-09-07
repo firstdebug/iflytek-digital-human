@@ -55,6 +55,16 @@ optional_tools:
 
 **官方接入指南**: https://www.yuque.com/xnrpt/bbc1du/usyebvyczgcy23pk
 **控制台地址**: https://virtual-man.xfyun.cn/console/projects
+**WebSocket 地址**: wss://avatar.cn-huadong-1.xf-yun.com/v1/interact
+
+`WS_URL 是平台常量`，不是用户凭据，也不是可选输入。必须由 `write_env_safe.py` 自动写入；不得询问用户、
+不得接受模型生成的替代 host/path。打开项目控制台必须执行：
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/tools/xfyun_common.py" projects
+```
+
+不得自行拼接控制台 URL 或用 `start https://...` 绕过该命令。
 
 ---
 
@@ -91,7 +101,7 @@ fi
 ```bash
 # 所有工具调用必须在插件根目录执行
 cd "${CLAUDE_PLUGIN_ROOT}"
-# 插件根目录示例：C:\Users\<你的用户名>\.claude\plugins\cache\avatar-local\avatar-platform\1.0.0
+# 插件根目录示例：<安装路径>\.claude\skills\avatar-platform\1.0.0
 ```
 
 **第 1 步：验证登录状态**
@@ -129,7 +139,7 @@ python tools/write_env_safe.py YOUR_APP_ID 336130030977552384 ~/.env
 # 输出（仅显示脱敏版本）：
 # [OK] API Key:    xxxx********xxxx
 # [OK] API Secret: xxxx********xxxx
-# [完成] 凭据已写入: /home/user/.env
+# [完成] 凭据已写入: <项目路径>/.env
 # [安全] 密钥未打印到控制台，仅存储在本地文件
 ```
 
@@ -228,15 +238,25 @@ python tools/write_env_safe.py YOUR_APP_ID 336130030977552384 ~/.env
 
 ## 关键约束 / HARD-GATE
 
-- **必须发布接口服务**：接口服务未点击 "发布"，appid 无法使用，连接时报错 10121。这是最常见的接入失败原因。
+- **固定端点门禁**：`WS_URL` 必须精确等于
+  `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact`；host、path、query 任一不同均阻断。
+- **缺凭据恢复门禁**：收到 `blocked_missing_credentials` 时，必须执行返回 JSON 中的 `next_action`：
+  `xfyun_common.py login` → `xfyun_query_services.py` → 携带平台返回的精确 `appId/sceneId` 重跑
+  `web_delivery.py`。不得要求用户提供 `WS_URL`、API 地址或控制台地址。
+- **阻断上报**：可恢复的凭据门禁保持 workflow 为 `in_progress`，由 `web_delivery.py` 自动记录并上传
+  `gate=web_delivery`、`gate_status` 和脱敏后的 `remaining_issues`；不得调用 fail/complete 抢先收口。
+- **必须发布接口服务**：未发布的 scene 不能用于 SDK 连接。但通用 `avatar authentication failed`
+  不能直接判定为未发布，必须转入 `avatar-troubleshoot/references/authentication-failed.md` 取证。
 - **API_SECRET 只显示一次**：控制台创建后必须立即复制保存，无法二次查看。
 - **只能使用已授权的形象和发音人**：未授权的 avatarId 连接时报错 10120。
 - **默认并发 1 路**：超过路数报错 11203。
-- **凭据格式**：`appId` 8 位数字；`apiKey`/`apiSecret`/`sceneId` 32 位十六进制；`avatarId` 纯数字或 `cnr` 开头。
+- **凭据格式不作为在线有效性的替代证据**：字段非空、Key/Secret 长度和固定端点只能做本地初筛；
+  appId/sceneId 的归属、类型和状态以平台实时查询为准，不用历史正则拒绝平台返回的合法值。
 
 ## Red Flags
 
-- ❌ 凭据配好但连接失败 → 优先检查 sceneId 是否已发布（10121）。
+- ❌ 凭据配好但出现通用鉴权失败 → 读取 `../avatar-troubleshoot/references/authentication-failed.md`，
+  依次检查真实错误码、canonical 签名、app/scene 归属、发布状态和资产授权，不得跳步定因。
 - ❌ 签名错误 / apiSecret 报错（10113）→ 检查 apiSecret 拼写和签名逻辑。
 - ❌ `.env` 未加入 `.gitignore` → 凭据泄露风险，必须确认 `.env`、`config/credentials.json`、`**/credentials.*` 已忽略。
 - ❌ 超拟人（cnr 开头）不支持透明背景，勿用于需要透明背景的场景。

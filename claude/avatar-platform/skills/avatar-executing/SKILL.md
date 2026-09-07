@@ -1,11 +1,6 @@
 ---
 name: avatar-executing
 description: 虚拟人集成任务的执行实现阶段（三阶段工作流第三阶段）
-tags:
-  - executing
-  - implementation
-  - code-generation
-priority: high
 ---
 
 # avatar-executing: 执行实现
@@ -13,6 +8,22 @@ priority: high
 ## 定位
 
 三阶段工作流的 **Phase 3: 执行实现**，负责按计划逐步实现代码，并进行质量评审和验证。
+
+先读 `../shared/delivery-modes.md`，接收上游 `workflow_mode: quick | strict`。
+
+- `quick`：主 agent 依 Playbook 直接实现，不派发 writer/reviewer，不生成过程文档。
+- `strict`：使用 writer/reviewer 循环，生成完整报告。
+
+模式不明确时返回上游询问用户，不能默认 quick，也不能边实现边补模式。
+
+## 共同前置门禁
+
+- 需求边界、启用与排除能力明确。
+- 首次自建或多能力扩展已有用户选择的 `workflow_mode`；没有选择时停止。
+- 新增语音、麦克风权限或录音代码前，已有用户对语音能力和交互形态的明确确认。
+- 凭据、sceneId 发布状态、资源授权、SDK、网络和工具链已验证。
+- Android/Web 首次接入全文读取对应真实 Playbook。
+- Android 构建按 `../shared/android-gradle-stability.md` 执行。
 
 ## 触发条件 / 调用时机
 
@@ -60,7 +71,38 @@ Step 5: 生成验证报告
 
 ---
 
+## Step 0: 前置验证与反幻觉检查
+
+**目标**：防止基于"常识推理"而非"实际代码/文档"的幻觉问题。
+
+### 0.1 加载反幻觉清单
+
+```bash
+Read references/anti-hallucination-checklist.md
+```
+
+**强制执行的核心原则**：
+- ❌ 禁止假设 API 端点、数据结构、文件内容
+- ✅ 必须 Read → Understand → Use
+- ✅ 检查 exit code，验证副作用
+- ✅ 不确定时说"我不知道"，而非编造
+
+### 0.2 前置门禁检查
+
+**必要条件**：
+- [ ] 需求边界明确（启用/排除能力已确认）
+- [ ] 工作模式已选择（quick/strict，不能默认或猜测）
+- [ ] 权限变更已告知（新增语音/麦克风权限需用户确认）
+
+**违规检测**：
+- 如果说"我假设使用 quick 模式" → **STOP，返回询问**
+- 如果说"这个 API 应该是..." → **STOP，先 Read 源码**
+
+---
+
 ## Step 1: 读取实现计划
+
+**【反幻觉检查点 A】：文件读取前**
 
 ### 1.1 解析计划文档
 
@@ -102,24 +144,51 @@ checks:
 **⚠️ 强制执行规则（不可跳过）**:
 
 1. **第一步：主 agent 必须先 Read playbook 全文**
-   - Android: `Read D:/avatar-platform-plugin/avatar-platform/skills/avatar-executing/references/android-sdk-build-playbook.md`
-   - Web: `Read D:/avatar-platform-plugin/avatar-platform/skills/avatar-executing/references/web-sdk-build-playbook.md`
+   - Android: `Read ${CLAUDE_PLUGIN_ROOT}/skills/avatar-executing/references/android-sdk-build-playbook.md`
+   - Web: `Read ${CLAUDE_PLUGIN_ROOT}/skills/avatar-executing/references/web-sdk-build-playbook.md`
    - **不允许**跳过直接手写代码，**不允许**用"我反编译过AAR"作为豁免理由
 
-2. **Android 必须用 playbook §6 完整模板，禁止自己拼 API**
+2. **Web SDK 必须执行确定性交付状态机，不接受模型自行编排**
+   - 运行状态机前主 agent 必须先 Read：`../avatar-credentials/SKILL.md`、`../avatar-artifact-download/SKILL.md`、`../avatar-network-debug/references/auth-verification.md`；这些真实 Read 才会形成对应 invocation，不能把状态机内部 Python 调用冒充 Skill invocation。
+   - 唯一入口：
+     `python "${CLAUDE_PLUGIN_ROOT}/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<text|voice|audio>"`
+   - 首次运行固定执行：平台获取完整凭据并安全写入 `.env` → 校验字段 → 安装哈希校验的 `xfyun-auth.mjs` → 下载/校验 SDK → 启动服务并记录实际端口 → 校验 `/api/config` 和 `/api/avatar-auth` 使用当前完整 Key/Secret → 打开浏览器。
+   - `WS_URL` 是平台常量，只能是 `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact`。不得询问用户、
+     不得接受其他 host/path、不得让代码从模型回复中读取地址；控制台只运行
+     `python "${CLAUDE_PLUGIN_ROOT}/tools/xfyun_common.py" projects` 打开。
+   - 浏览器产生真实运行证据后再次运行**同一命令**；状态机才会执行最终 gate，且只有 `ready_to_deliver` 才调用 telemetry complete。
+   - 退出码 2 表示确定性阻塞，3 表示等待浏览器证据，0 才表示可交付。2/3 都保持同一 workflow 进行中。
+   - 退出码 2 时必须解析 stdout JSON：若状态为 `blocked_missing_credentials`，立即读取并执行
+     `next_action.commands`，转入 `avatar-credentials`。禁止改成自由文本指导、禁止自行补 URL、禁止把终端命令甩给用户。
+   - **非终态门禁上报**由 `web_delivery.py` 自动调用 `telemetry.report_gate`，记录 gate/status/issues 但不结束
+     workflow；退出码 3 同样上报等待验证状态。模型不得手工调用 `report_gate`、`report_fail` 或 `report_complete`。
+   - 禁止绕过状态机直接手写/读取 `.env`、直接运行 `web_sdk_gate.py` 或 `telemetry.py complete`；禁止手写 `.runtime/web-runtime-evidence.json`；禁止杀掉全部 Node 进程。PID/端口只作为当前服务状态和实际访问 URL，不是身份硬门禁。
+   - `server.js` 不得手写 HMAC 或 signed URL。必须挂载脚本生成的 `xfyun-auth.mjs` 导出的 `avatarConfigHandler` 和 `avatarAuthHandler`；其哈希不匹配时停止。
+   - 读取工具确认的真实 `index.d.ts`，导入必须使用 `module.default`；逐项确认 `setApiInfo`、`setGlobalParams`、`start` 和目标驱动方法。
+   - 状态机内部只通过 `write_env_safe.py --profile web-sdk` 获取完整凭据；脱敏输出不得拼回 `.env`，不得回显密钥或解码后的 Authorization。
+   - 服务端签名先读 `../avatar-network-debug/references/auth-verification.md`，必须包含 request-line 和 `headers="host date request-line"`。
+   - Playwright/浏览器测试必须生成真实 `connected`、`stream_start`、首帧和目标交互证据，不得手写通过值。
+
+3. **Android 必须用 playbook §6 完整模板，禁止自己拼 API**
    - MainActivity: 必须基于 `references/android-mainactivity-template.java` 修改（140+ 行真实可跑模板）
    - build.gradle: 必须用 playbook §6.3 模板（jniLibs.srcDirs/okhttp/gson依赖/AGP 8.1.4）
-   - settings.gradle: 必须用 playbook §6.1（阿里云镜像）
-   - gradle.properties: 必须用 playbook §3.2 六项性能配置
+   - settings.gradle: 必须用 `templates/android-build-template/settings.gradle.template`
+     （镜像顺序：阿里云 → 腾讯云 → 华为云 → 官方兜底）
+   - gradle.properties: 必须用 `templates/android-build-template/gradle.properties`
+     （Xmx1280m、parallel=false、workers.max=2）
+   - 构建执行、超时处理和离线验收必须遵循 `../shared/android-gradle-stability.md`：
+     同一工程同时只跑一个 Gradle 调用；命令超时先检查原进程再决定等待，禁止立即重跑；
+     冷缓存先在线预热再 `--offline` 复验；禁止无依据 `clean --refresh-dependencies`、
+     禁止删除全局 Gradle 缓存、禁止杀死全部 Java 进程。
 
-3. **Android API 黑名单自动检测（写完代码后必须 grep）**
+4. **Android API 黑名单自动检测（写完代码后必须 grep）**
    ```bash
    # 这些 API 在真实 SDK 中不存在，命中即报错
    grep -r "createStreamPlayer\|sendText\|onNlpResult\|onAsrResult\|onAvatarReady\|writeAudioFrame\|startAudioInteract\|setApiKey(" <工程目录>
    ```
    如果 grep 有输出，说明用了错误 API，必须按 playbook §1 真实签名改写
 
-4. **Gradle Wrapper 必须用预置模板（见 §2.0.2），禁止在线下载**
+5. **Gradle Wrapper 必须用预置模板（见 §2.0.2），禁止在线下载**
 
 **违规后果（Web）**: 遗漏 bitrate → `must be ≥ 200`；只配顶层 stream.bitrate → SDK /1024 变成 1；前端硬编码 apiSecret → 泄露。
 **违规后果（Android）**: 照 integration-guides/android.md 简化 API 写 → `sendText`/`createStreamPlayer`/`onNlpResult` 等不存在 → 编译失败或运行崩溃；`--no-daemon` → 编译 20+ 分钟；未 setRenderArea → 黑屏。
@@ -246,14 +315,23 @@ grep -q "org.gradle.daemon=true" gradle.properties || echo "[ERROR] 缺 gradle �
 ## 关键约束 / HARD-GATE / Red Flags
 
 **HARD-GATE（前置门槛，未满足禁止进入 Step 3）**:
-- design_spec 必须存在
-- 实现计划必须已评审
+- `workflow_mode` 已由用户选择（首次自建或多能力扩展）；未选择时停止
+- `strict` 模式：design_spec 必须存在、实现计划必须已评审
+- `quick` 模式：实施摘要边界（`features` / `excluded`）已确认；不要求设计或计划文件存在
+- 新增语音、麦克风权限或录音代码前，已有用户对语音能力和交互形态的明确确认
 - preflight 环境验证必须已通过
 - 依赖必须就绪
 
 **Red Flags（领域适配模式必查的高危陷阱）**:
+- **用户未选择语音却加入麦克风权限、`RECORD_AUDIO` 或录音代码 → 违反语音门禁，必须回退确认**
+- **用户未选择交付模式却开始首次自建或多能力扩展 → 违反交付模式门禁**
+- **快速模式仍生成 design-spec/implementation-plan 或派发常规 writer/reviewer → 违反 quick 约定**
+- 未发布/未授权资源进入运行配置
 - **[Web] 只配顶层 `stream.bitrate:2000` 而不手写 `avatar.stream` → SDK 会 /1024 变成 1，报 `must be ≥ 200`。必须按 playbook §3 手写 `avatar.stream` 用真实 kbps 值**
 - **[Web] 前端 JS 硬编码 apiSecret → 安全泄露。必须用 Node 后端签名 + signedUrl（playbook §1）**
+- **[Web] SDK 缺失、只通过 HTTP/config 检查或没有浏览器事件证据却标记完成 → 必须保持 `blocked_missing_sdk` / `needs_runtime_verification`，禁止 Reporter complete**
+- **[Web] 手工创建 `.env`、读取并回显凭据、全局结束 Node、手写 signed URL 或在浏览器证据前直接跑最终 gate → 必须停止并改用 `web_delivery.py run`**
+- **[Web] 使用 `setServerUrl()`、`getPlayer()` 或把 `AvatarPlatform` 当具名导出 → 真实 SDK 不支持，必须按 `index.d.ts` 修正**
 - 透明背景仅配置一处 → 必须 `stream.setAlpha` 与播放器 `setBgAlpha` 两处都配
 - 透明背景使用非 XRTC 协议（WebRTC/等）→ 无效，仅 XRTC 支持
 - 录音器采样率 ≠ 16000 → 虚拟人 SDK 要求 16000
@@ -321,7 +399,9 @@ grep -q "org.gradle.daemon=true" gradle.properties || echo "[ERROR] 缺 gradle �
 
 | 文件 | 内容 |
 |------|------|
+| references/anti-hallucination-checklist.md | **【贯穿全流程】反幻觉验证清单：API调用/数据访问/文件编辑/工具执行/链接引用/子agent派发的强制验证规则** |
 | references/web-sdk-build-playbook.md | **【HARD-GATE】Web SDK 自建工程唯一权威流程：架构/六步/字段锁定表/bitrate 陷阱/验证清单** |
+| references/android-sdk-build-playbook.md | **【HARD-GATE】Android SDK 自建工程唯一权威流程：真实API全表/六步/字段锁定表/性能配置/模板/黑名单检测** |
 | references/execution-loop.md | Step 3.1 执行循环完整代码（writer/reviewer 选择、应用变更、验证） |
 | references/avatar-code-writer.md | Step 3.2 avatar-code-writer 领域适配器 5 大能力代码示例 |
 | references/avatar-code-reviewer.md | Step 3.3 avatar-code-reviewer 领域适配器专有检查（陷阱/配置/资源/错误处理，含反例） |
@@ -379,4 +459,3 @@ grep -q "org.gradle.daemon=true" gradle.properties || echo "[ERROR] 缺 gradle �
 4. 直接运行 `gradlew assembleDebug`，无需等待 wrapper 下载
 
 **立即执行**: 见 `scripts/setup-android-build-template.sh`（需手动创建该脚本并执行一次）
-

@@ -39,12 +39,13 @@ async function verifyProject() {
   if (fs.existsSync('.env')) {
     const envContent = fs.readFileSync('.env', 'utf-8');
     const requiredVars = [
-      'VITE_AVATAR_APP_ID',
-      'VITE_AVATAR_API_KEY',
-      'VITE_AVATAR_API_SECRET',
-      'VITE_AVATAR_SCENE_ID',
-      'VITE_AVATAR_AVATAR_ID',
-      'VITE_AVATAR_VCN'
+      'APP_ID',
+      'API_KEY',
+      'API_SECRET',
+      'SCENE_ID',
+      'AVATAR_ID',
+      'VCN',
+      'WS_URL'
     ];
     
     for (const varName of requiredVars) {

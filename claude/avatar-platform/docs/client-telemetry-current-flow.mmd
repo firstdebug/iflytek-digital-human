@@ -1,0 +1,54 @@
+flowchart TD
+  Start["Claude Code 事件"] --> Consent{"当前声明是否已明确同意"}
+  Consent -->|"否: undecided / stale / declined"| Disabled["立即退出: 不解析 Prompt 或工具参数\n不写 state, 不采集, 不上传"]
+  Consent -->|"是: accepted"| Hook{"Hook 类型"}
+
+  subgraph Collection["采集与本地工作流"]
+    Hook -->|"UserPromptSubmit"| Prompt["识别 slash 命令或虚拟人关键词\n先提交本轮数据"]
+    Prompt --> Resume["同设备 + 同 cwd + 最近活动在 5 分钟内\n无有效完成证据或 SDK 被误关时复用原 workflowId"]
+    Resume --> PromptCommit["补齐可用的讯飞账号哈希\n提交 in_progress workflow"]
+    PromptCommit --> InitialUpload["异步首报\n非 force, 遵守退避"]
+    PromptCommit --> Reconcile["收口 30 分钟前遗留工作流"]
+    Reconcile --> Evidence["检查三个固定完成标记\n不遍历项目目录"]
+
+    Hook -->|"PreToolUse"| Tool{"工具类型"}
+    Tool -->|"Skill"| Invocation["按 workflow + skill 去重记录调用"]
+    Tool -->|"Read"| SkillRead{"是否读取 SKILL.md 或 skill 自带资源"}
+    SkillRead -->|"是"| Invocation
+    SkillRead -->|"否"| Ignore["忽略, 不写状态"]
+    Tool -->|"Bash / PowerShell"| PlatformNote["仅筛选平台脚本为相关\n当前无独立记录或发送动作"]
+
+    Invocation --> Intent{"主交付类型是否改变"}
+    Intent -->|"否"| LocalDB[("JSON state.json")]
+    Intent -->|"是"| Cancel["旧 workflow = cancelled\n同一会话创建新 workflow"]
+    Cancel --> LocalDB
+    PromptCommit --> LocalDB
+    Evidence -->|"无完成证据"| LocalDB
+    Evidence -->|"ready_to_deliver=true"| Finalize["workflow = completed\nupload_status = pending"]
+    Finalize --> LocalDB
+
+    Hook -->|"Stop: 每轮回复结束"| Flush["扫描完成证据; 有 pending 就启动 uploader"]
+    Hook -->|"SessionEnd"| End["复用或检查证据\n否则 in_progress -> interrupted"]
+    End --> LocalDB
+    End --> Force["强制启动 uploader"]
+    Reporter["Skill Reporter\nSDK complete 需 --project + verification flag"] --> LocalDB
+    Reporter --> Force
+    Reconcile -->|"产生终态"| Force
+    Finalize --> Force
+  end
+
+  subgraph Upload["上传边界"]
+    InitialUpload --> Uploader["一次性后台 uploader"]
+    Flush --> Uploader["一次性后台 uploader"]
+    Force --> Uploader
+    Uploader --> Endpoint{"同意仍有效\n且声明地址等于配置地址"}
+    Endpoint -->|"否"| NoPost["停止: 不发 POST"]
+    Endpoint -->|"是"| Lock["单实例锁 + 指数退避\nforce 仅跳过退避"]
+    Lock --> Batch["分批读取 upload_status=pending\n再次清理路径和敏感细节"]
+    Batch --> Recheck{"每批 POST 前再次检查同意"}
+    Recheck -->|"撤回或变 stale"| NoPost
+    Recheck -->|"仍同意"| Post["POST /avatarTelemetry/report"]
+    Post --> Ack{"服务端 accepted IDs"}
+    Ack -->|"ID + revision 已确认"| Uploaded["对应记录 upload_status=uploaded"]
+    Ack -->|"拒绝 / 未确认 / 网络失败"| Pending["保持 pending 或进入 dead_letter\n等待后续重试或人工排查"]
+  end

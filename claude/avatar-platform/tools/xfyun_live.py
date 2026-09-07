@@ -17,7 +17,7 @@
 
 说明
   - 创建完成后自动打开浏览器跳转到配置页面（可手动调整商品/分镜/脚本）
-  - 默认形象: 晓姿-蓝色制服 (110117026)
+  - 默认形象: 111310001
   - 默认发音人: 灵小琪 x4_lingxiaoqi_oral
   - 默认商品: "商品1"
   - 默认分镜: "分镜1"（空脚本）
@@ -64,7 +64,7 @@ ASSET_SCENE_VCN = 1     # 发音人授权 scene（控制台实测走 scene=1，�
 # ==================== 默认配置常量 ====================
 DEFAULT_SCENE_NAME = "直播助手"
 DEFAULT_THUMBNAIL = "https://openstorage.xfyousheng.com/asset/asset/20260507/eba80a31-0b8b-4702-af05-a35f8a342263.jpg"
-DEFAULT_ANCHOR_ID = "110117026"
+DEFAULT_ANCHOR_ID = "111310001"
 DEFAULT_VCN = "x4_lingxiaoqi_oral"
 DEFAULT_BG_URL = "https://openstorage.xfyousheng.com/asset/asset/20240606/9dfc4c95-fc23-4461-bc8d-bc52e2bfa134.jpeg"  # 直播默认背景
 DEFAULT_LOGO_URL = ""

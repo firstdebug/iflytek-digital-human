@@ -5,7 +5,7 @@
 ## Step 1: 复制模板到目标目录
 
 ```bash
-cp -r D:/avatar-platform-plugin/avatar-platform/skills/avatar-executing/templates/android-build-template/* <目标工程根目录>/
+cp -r ${CLAUDE_PLUGIN_ROOT}/skills/avatar-executing/templates/android-build-template/* <目标工程根目录>/
 ```
 
 ## Step 2: 处理模板占位符

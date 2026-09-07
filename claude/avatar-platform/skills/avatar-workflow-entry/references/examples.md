@@ -86,16 +86,66 @@ suggested_route: avatar-brainstorming
 ```
 低置信度，使用完整工作流:
 
-执行: avatar-brainstorming
+先执行交付模式门禁（HARD-GATE）:
+  AskUserQuestion: 快速交付（推荐）还是严格流程？
+  → 用户未回答前不进入实施
+
+执行: avatar-brainstorming（携带 workflow_mode）
   Phase 1: 扫描工程（未检测到 SDK）
   Phase 2: 环境门禁（preflight）
   Phase 3: 意图分类 → 首次接入
-  Phase 4: 访谈
+  Phase 4: 需求确认
     - 平台？Web / Android / iOS
-    - 功能？文本驱动 / 语音交互
+    - 功能？文本驱动 / 文本交互 / 字幕（语音需单独确认，见示例 5）
     - 效果？透明背景 / 动作控制
-  Phase 5: 生成设计文档
-  ...
+  Phase 5-7: 仅 strict 生成设计文档并评审；quick 直接交给 avatar-executing
+```
+
+---
+
+## 示例 5: 给现有项目加语音（必须先确认，不能直接实施）
+
+**用户输入**:
+```
+"给我现有的 Android 虚拟人项目加上语音交互"
+```
+
+**识别结果**:
+```yaml
+type: voice_feature_extension
+confidence: 0.9
+evidence:
+  - "加上语音交互" → 新增语音能力
+  - "现有 Android 项目" → 工程和平台明确
+suggested_route: voice-interact
+gate_required: voice_confirmation  # 即使置信度高也必须先问
+```
+
+**路由**:
+```
+⚠️ 工程和目标都明确，但语音门禁仍必须先执行——不能直接改 Manifest 或写录音代码。
+
+Step 1: AskUserQuestion 确认语音能力和交互形态
+  "确认加入语音识别/语音问答？请选择交互方式："
+    - 按住说话
+    - 点击开始/停止
+    - 自动 VAD
+    - 全双工实时对话（改用 full-duplex）
+
+Step 2: 用户明确确认后才执行
+  执行: voice-interact（携带已确认的交互形态）
+    + avatar-permissions-setup（RECORD_AUDIO 运行时权限）
+
+用户未确认前禁止:
+  ✗ 修改 AndroidManifest.xml 添加 RECORD_AUDIO
+  ✗ 写录音器代码或语音 UI
+  ✗ 申请麦克风权限
+```
+
+**反例（历史错误行为）**:
+```
+✗ "工程明确、目标明确 → 直接开始改 Manifest 加 RECORD_AUDIO 并写录音代码"
+  语音会引入麦克风权限和用户数据采集，属于扩大用户能力面的改动，必须单独确认。
 ```
 
 ---

@@ -206,15 +206,16 @@ const envContent = `
 # 虚拟人平台凭据
 # 生成时间: ${new Date().toISOString()}
 
-VITE_AVATAR_APP_ID=${appId}
-VITE_AVATAR_API_KEY=${apiKey}
-VITE_AVATAR_API_SECRET=${apiSecret}
-VITE_AVATAR_SCENE_ID=${sceneId}
-VITE_AVATAR_AVATAR_ID=${avatarId}
-VITE_AVATAR_VCN=${vcn}
+APP_ID=${appId}
+API_KEY=${apiKey}
+API_SECRET=${apiSecret}
+SCENE_ID=${sceneId}
+AVATAR_ID=${avatarId}
+VCN=${vcn}
+WS_URL=wss://avatar.cn-huadong-1.xf-yun.com/v1/interact
 `;
 
-// 写入 .env 文件
+// 仅写入 Node 服务端读取的 .env；不得使用 VITE_ 前缀暴露 Key/Secret
 fs.writeFileSync('.env', envContent);
 console.log('✅ 凭据已保存到 .env 文件');
 ```
