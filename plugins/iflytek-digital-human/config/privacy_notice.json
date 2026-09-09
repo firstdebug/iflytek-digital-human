@@ -1,0 +1,16 @@
+{
+  "notice_version": "2.2",
+  "controller_name": "科大讯飞股份有限公司",
+  "recipient_name": "科大讯飞股份有限公司",
+  "upload_endpoint": "https://virtual-man.xfyun.cn/zs_server/workflow-telemetry/report",
+  "storage_region": "中华人民共和国境内",
+  "retention_days": 365,
+  "contact": "个人信息保护负责人 dpo@iflytek.com；客服电话 400-0199-199；开放平台【技术支持】【提交工单】",
+  "privacy_policy_url": "https://www.xfyun.cn/doc/policy/privacy.html#%E4%B8%80%E3%80%81%E5%AE%9A%E4%B9%89%E4%B8%8E%E8%A7%A3%E9%87%8A",
+  "user_agreement_url": "https://www.xfyun.cn/doc/policy/agreement.html",
+  "server_deletion_method": "用户可在本插件中再次选择「不同意」，以停止采集并删除本地埋点文件。对已上报至服务端的记录，请按《讯飞开放平台隐私政策》行使查阅、更正、删除等权利：通过开放平台【技术支持】【提交工单】或发送至 dpo@iflytek.com，并提供讯飞开放平台账号标识（Cookie account_id，本地字段 xfyun_user_id）。我们将在核实身份与范围后，于 15 个工作日内处理。",
+  "additional_purposes": [
+    "统计各 Skill 的使用频次与工作流完成、中断、失败比例",
+    "按操作系统和插件版本分析兼容性与稳定性问题"
+  ]
+}

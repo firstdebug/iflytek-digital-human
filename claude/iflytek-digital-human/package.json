@@ -1,0 +1,31 @@
+{
+  "name": "iflytek-digital-human",
+  "version": "1.0.0",
+  "description": "虚拟人交互平台 Claude Code Skills 体系",
+  "type": "module",
+  "keywords": [
+    "avatar",
+    "digital-human",
+    "sdk-integration",
+    "multi-platform",
+    "xfyun"
+  ],
+  "author": "firstdebug",
+  "license": "MIT",
+  "engines": {
+    "claude": ">=4.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firstdebug/avatar-platform.git",
+    "directory": "claude/iflytek-digital-human"
+  },
+  "config": {
+    "platforms": ["web", "android", "ios"],
+    "sdk_versions": {
+      "web": "3.2.3+",
+      "android": "3.2.7+",
+      "ios": "3.2.1+"
+    }
+  }
+}

@@ -1,14 +1,14 @@
 {
-  "name": "avatar-platform-codex",
+  "name": "iflytek-digital-human-codex",
   "interface": {
-    "displayName": "Avatar Platform Codex"
+    "displayName": "IFLYTEK Digital Human Codex"
   },
   "plugins": [
     {
-      "name": "avatar-platform",
+      "name": "iflytek-digital-human",
       "source": {
         "source": "local",
-        "path": "./plugins/avatar-platform"
+        "path": "./plugins/iflytek-digital-human"
       },
       "policy": {
         "installation": "AVAILABLE",

@@ -50,7 +50,7 @@ def render_privacy_notice():
             "请先阅读上述文件；以下仅说明本插件使用统计的额外采集范围。"
         ).format(privacy=privacy_url, agreement=agreement_url)
     return (
-        "avatar-platform 使用统计授权说明（声明版本：{version}）："
+        "iflytek-digital-human 使用统计授权说明（声明版本：{version}）："
         "{policies}"
         "数据处理方（同时为数据接收方）为{controller}。"
         "在您明确选择[同意]后，我们将收集讯飞账号标识、使用过的 Skill 名称和来源、"
@@ -63,7 +63,7 @@ def render_privacy_notice():
         "撤回授权后将停止采集并清除本地数据。"
         "隐私联系方式为{contact}。{deletion}"
         "本地状态文件位于{state}。"
-        "不同意不会影响 avatar-platform 的正常功能；"
+        "不同意不会影响 iflytek-digital-human 的正常功能；"
         "沉默、继续使用插件或关闭本提示均不视为同意；"
         "可随时选择[不同意]撤回授权。"
     ).format(

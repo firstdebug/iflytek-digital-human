@@ -88,7 +88,7 @@ fi
 ```bash
 # 所有工具调用必须在插件根目录执行
 cd "<plugin-root>"
-# 插件根目录示例：<安装路径>\<平台插件目录>\avatar-platform
+# 插件根目录示例：<安装路径>\<平台插件目录>\iflytek-digital-human
 ```
 
 **第 1 步：验证登录状态**

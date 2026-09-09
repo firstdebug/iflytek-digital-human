@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 import sys
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[1] / 'claude' / 'iflytek-digital-human'
 sys.path.insert(0, str(ROOT / 'tools'))
 import telemetry_common as tc
 import uploader

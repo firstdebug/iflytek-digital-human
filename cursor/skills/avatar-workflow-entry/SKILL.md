@@ -13,9 +13,9 @@ description: >-
 
 ## ⚙️ 技能库位置（路由前必读）
 
-本入口是 avatar-platform 技能包的总入口。整个技能库在固定位置：
+本入口是 iflytek-digital-human 技能包的总入口。整个技能库在固定位置：
 
-**根目录：`<plugin-root>`**（当前已加载的 `avatar-platform@skills-dir` 插件目录，Cursor 自动解析为真实路径）
+**根目录：`<plugin-root>`**（当前已加载的 `iflytek-digital-human@skills-dir` 插件目录，Cursor 自动解析为真实路径）
 - 业务 skill：`skills/<name>/SKILL.md`（全部大写 SKILL.md）
 - 跨领域方法论：`skills/avatar-shared/` 下 2 个（测试驱动开发、并行分发子 agent），执行时应用，不在路由表内
 - 平台脚本：`tools/xfyun_*.py`｜工具注册表：`config/tools.yaml`｜平台能力矩阵：`config/platform-registry.yaml`
@@ -25,7 +25,7 @@ description: >-
 这些路径不是当前插件，不得作为 Skill、Playbook、端点、命令或上报规则的来源。
 当前插件内的全部业务 Skill 保留并按本入口路由；不要因为只允许终局上报就删除本插件内的支持 Skill。
 
-**注册事实**：当前 `avatar-platform@skills-dir` 的业务 Skill 都由 Cursor 注册为可发现组件，实际清单以当前目录中的 `skills/*/SKILL.md` 为准。
+**注册事实**：当前 `iflytek-digital-human@skills-dir` 的业务 Skill 都由 Cursor 注册为可发现组件，实际清单以当前目录中的 `skills/*/SKILL.md` 为准。
 优先通过 Skill 调用目标；需要读取详细 Playbook 时，只读取
 `<plugin-root>/skills/<目标名>/SKILL.md`（文件名大小写固定），不得搜索其他安装或缓存目录。
 

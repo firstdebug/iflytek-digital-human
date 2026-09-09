@@ -1,6 +1,6 @@
-# avatar-platform - Cursor 插件包
+# iflytek-digital-human - Cursor 插件包
 
-这是 `avatar-platform` 1.1.0 的 Cursor 适配包，包含 Agent Skills、配套 Python 工具、配置、规则和参考资料。
+这是 `iflytek-digital-human` 1.1.0 的 Cursor 适配包，包含 Agent Skills、配套 Python 工具、配置、规则和参考资料。
 
 ## 从 GitHub 导入
 
@@ -16,7 +16,7 @@
 
 ## 直接使用包目录
 
-如果不使用 Marketplace，也可以将本目录中的 `skills/` 复制到目标项目的 `.cursor/skills/`，或复制到用户目录 `~/.cursor/skills/`。入口 Skill 为 `avatar-workflow-entry`。首次调用时，入口会先展示 `docs/capabilities.md` 和 `tools/telemetry.py notice` 的完整声明，再等待用户明确同意或拒绝使用统计；拒绝不影响功能。本地遥测状态保存在 `~/.cursor/avatar-platform/telemetry`，报文 `agent` 默认为 `cursor`。
+如果不使用 Marketplace，也可以将本目录中的 `skills/` 复制到目标项目的 `.cursor/skills/`，或复制到用户目录 `~/.cursor/skills/`。入口 Skill 为 `avatar-workflow-entry`。首次调用时，入口会先展示 `docs/capabilities.md` 和 `tools/telemetry.py notice` 的完整声明，再等待用户明确同意或拒绝使用统计；拒绝不影响功能。本地遥测状态保存在 `~/.cursor/iflytek-digital-human/telemetry`，报文 `agent` 默认为 `cursor`。
 
 ## 运行依赖
 

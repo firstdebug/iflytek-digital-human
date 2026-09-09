@@ -15,9 +15,12 @@ import yaml
 
 
 REPO = Path(__file__).resolve().parents[1]
+PLUGIN_NAME = "iflytek-digital-human"
+LEGACY_PLUGIN_NAME = "avatar-platform"
+CLAUDE_PACKAGE = REPO / "claude" / PLUGIN_NAME
 PACKAGES = {
     "cursor": REPO / "cursor",
-    "codex": REPO / "plugins" / "avatar-platform",
+    "codex": REPO / "plugins" / PLUGIN_NAME,
 }
 FRONTMATTER = re.compile(r"^---\r?\n(.*?)\r?\n---", re.DOTALL)
 
@@ -53,6 +56,7 @@ class PlatformPackageTests(unittest.TestCase):
         }
         for platform, root in PACKAGES.items():
             manifest = json.loads((root / manifests[platform]).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["name"], PLUGIN_NAME)
             self.assertEqual(manifest["version"], "1.1.0")
             for relative in (
                 "docs/capabilities.md",
@@ -66,6 +70,54 @@ class PlatformPackageTests(unittest.TestCase):
                 "skills/avatar-workflow-entry/SKILL.md",
             ):
                 self.assertTrue((root / relative).is_file(), f"{platform}: {relative}")
+
+    def test_marketplaces_use_new_plugin_identity(self):
+        claude = json.loads(
+            (REPO / ".claude-plugin" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        codex = json.loads(
+            (REPO / ".agents" / "plugins" / "marketplace.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        cursor = json.loads(
+            (REPO / ".cursor-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(claude["name"], PLUGIN_NAME + "-marketplace")
+        self.assertEqual(claude["plugins"][0]["name"], PLUGIN_NAME)
+        self.assertEqual(
+            claude["plugins"][0]["source"],
+            "./claude/" + PLUGIN_NAME,
+        )
+        self.assertEqual(codex["name"], PLUGIN_NAME + "-codex")
+        self.assertEqual(codex["plugins"][0]["name"], PLUGIN_NAME)
+        self.assertEqual(
+            codex["plugins"][0]["source"]["path"],
+            "./plugins/" + PLUGIN_NAME,
+        )
+        self.assertEqual(cursor["name"], PLUGIN_NAME)
+
+        claude_manifest = json.loads(
+            (CLAUDE_PACKAGE / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(claude_manifest["name"], PLUGIN_NAME)
+
+    def test_claude_hooks_use_new_plugin_command_prefix(self):
+        intent = (CLAUDE_PACKAGE / "hooks" / "avatar_intent.py").read_text(
+            encoding="utf-8"
+        )
+        tracker = (CLAUDE_PACKAGE / "hooks" / "tracker.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/" + PLUGIN_NAME + ":", intent)
+        self.assertIn("/" + PLUGIN_NAME + ":", tracker)
 
     def test_skill_frontmatter_matches_directory(self):
         for platform, root in PACKAGES.items():
@@ -115,7 +167,51 @@ class PlatformPackageTests(unittest.TestCase):
                         f"telemetry_common_{platform}",
                     )
                 self.assertEqual(module.AGENT_NAME, platform)
-                self.assertEqual(module.TELEMETRY_DIR, Path(temp) / "avatar-platform" / "telemetry")
+                self.assertEqual(
+                    module.TELEMETRY_DIR,
+                    Path(temp) / PLUGIN_NAME / "telemetry",
+                )
+
+    def test_legacy_telemetry_is_copied_to_new_plugin_directory(self):
+        for platform, root in PACKAGES.items():
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                home = Path(temp)
+                legacy = home / LEGACY_PLUGIN_NAME / "telemetry"
+                legacy.mkdir(parents=True)
+                (legacy / "consent.json").write_text(
+                    '{"accepted": false}', encoding="utf-8"
+                )
+                env_name = "CURSOR_HOME" if platform == "cursor" else "CODEX_HOME"
+                with mock.patch.dict("os.environ", {env_name: temp}, clear=False):
+                    module = load_module(
+                        root / "tools" / "telemetry_common.py",
+                        f"telemetry_common_legacy_{platform}",
+                    )
+
+                migrated = home / PLUGIN_NAME / "telemetry" / "consent.json"
+                self.assertEqual(module.TELEMETRY_DIR, migrated.parent)
+                self.assertEqual(migrated.read_text(encoding="utf-8"), '{"accepted": false}')
+                self.assertTrue((legacy / "consent.json").is_file())
+
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            legacy = home / ".claude" / LEGACY_PLUGIN_NAME / "telemetry"
+            legacy.mkdir(parents=True)
+            (legacy / "consent.json").write_text(
+                '{"accepted": false}', encoding="utf-8"
+            )
+            with mock.patch("pathlib.Path.home", return_value=home):
+                module = load_module(
+                    CLAUDE_PACKAGE / "tools" / "telemetry_common.py",
+                    "telemetry_common_legacy_claude",
+                )
+
+            migrated = (
+                home / ".claude" / PLUGIN_NAME / "telemetry" / "consent.json"
+            )
+            self.assertEqual(module.TELEMETRY_DIR, migrated.parent)
+            self.assertEqual(migrated.read_text(encoding="utf-8"), '{"accepted": false}')
+            self.assertTrue((legacy / "consent.json").is_file())
 
     def test_uploader_defaults_to_platform_agent(self):
         for platform, root in PACKAGES.items():
@@ -143,7 +239,7 @@ class PlatformPackageTests(unittest.TestCase):
                 self.assertEqual(output, {
                     "status": "skipped", "reason": "disabled"})
                 self.assertFalse(
-                    (home / "avatar-platform" / "telemetry" / "state.json").exists())
+                    (home / PLUGIN_NAME / "telemetry" / "state.json").exists())
 
     def test_explicit_lifecycle_records_and_deduplicates_skills(self):
         for platform in PACKAGES:
@@ -167,7 +263,7 @@ class PlatformPackageTests(unittest.TestCase):
                 self.assertTrue(first["recorded"])
                 self.assertFalse(second["recorded"])
 
-                state_path = home / "avatar-platform" / "telemetry" / "state.json"
+                state_path = home / PLUGIN_NAME / "telemetry" / "state.json"
                 state = json.loads(state_path.read_text(encoding="utf-8"))
                 self.assertEqual(len(state["workflows"]), 1)
                 self.assertEqual(state["workflows"][0]["agent"], platform)

@@ -1,0 +1,28 @@
+{
+  "name": "iflytek-digital-human",
+  "version": "1.0.0",
+  "description": "讯飞虚拟人交互平台 Codex Skills 插件",
+  "type": "module",
+  "keywords": [
+    "avatar",
+    "digital-human",
+    "sdk-integration",
+    "multi-platform",
+    "xfyun"
+  ],
+  "license": "MIT",
+  "author": "firstdebug",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firstdebug/avatar-platform.git",
+    "directory": "plugins/iflytek-digital-human"
+  },
+  "config": {
+    "platforms": ["web", "android", "ios"],
+    "sdk_versions": {
+      "web": "3.2.3+",
+      "android": "3.2.7+",
+      "ios": "3.2.1+"
+    }
+  }
+}

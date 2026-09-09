@@ -5,7 +5,7 @@
 import unittest
 from pathlib import Path
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+PLUGIN_ROOT = Path(__file__).resolve().parents[1] / "claude" / "iflytek-digital-human"
 SKILLS_ROOT = PLUGIN_ROOT / "skills"
 
 

@@ -1,4 +1,6 @@
-# avatar-platform
+# iflytek-digital-human
+
+> 原插件 ID `avatar-platform` 已整体更名为 `iflytek-digital-human`。升级时请先卸载或禁用旧插件，避免两套 Hook 或 Skill 同时加载。首次运行新版本时，会将旧遥测目录中的授权状态和未完成工作流复制到新目录；旧目录保留用于回退。
 
 讯飞虚拟人交互平台接入插件，覆盖 Web 对话模板、数字人直播、Web/Android/iOS SDK、WebAPI、模型配置、知识库、凭据获取和故障排查。
 
@@ -10,7 +12,7 @@
 
 ```bash
 claude plugin marketplace add https://github.com/firstdebug/avatar-platform.git
-claude plugin install avatar-platform@avatar-platform-marketplace
+claude plugin install iflytek-digital-human@iflytek-digital-human-marketplace
 ```
 
 验证：
@@ -23,7 +25,7 @@ claude plugin list
 
 ```bash
 codex plugin marketplace add firstdebug/avatar-platform --ref main
-codex plugin add avatar-platform@avatar-platform-codex
+codex plugin add iflytek-digital-human@iflytek-digital-human-codex
 ```
 
 验证：
@@ -41,7 +43,7 @@ Cursor 当前推荐通过 Dashboard 导入 GitHub 插件仓库：
 1. 打开 Cursor Dashboard 的 `Plugins` -> `Team Marketplaces`。
 2. 选择 `Add Marketplace` -> `Import from Repo`。
 3. 输入 `https://github.com/firstdebug/avatar-platform` 并导入。
-4. 在 Cursor 的 `Customize` -> `Plugins` 或 `Customize` -> `Skills` 中确认 `avatar-platform` 已启用。
+4. 在 Cursor 的 `Customize` -> `Plugins` 或 `Customize` -> `Skills` 中确认 `iflytek-digital-human` 已启用。
 
 仓库根目录的 `.cursor-plugin/plugin.json` 专门用于 Cursor 导入，实际内容位于 `cursor/skills/`、`cursor/tools/`、`cursor/config/`、`cursor/rules/` 和 `cursor/agents/`。也可以只将 `cursor/skills/` 复制到项目的 `.cursor/skills/` 或用户目录 `~/.cursor/skills/`。
 
@@ -58,20 +60,20 @@ Cursor 当前推荐通过 Dashboard 导入 GitHub 插件仓库：
 ## 仓库结构
 
 ```text
-avatar-platform/
+iflytek-digital-human/
 ├─ .claude-plugin/marketplace.json  # Claude Code marketplace
 ├─ .agents/plugins/marketplace.json  # Codex marketplace
 ├─ .cursor-plugin/plugin.json        # Cursor 根仓库插件清单
-├─ claude/avatar-platform/           # Claude Code 自包含插件
-├─ plugins/avatar-platform/          # Codex 自包含插件
+├─ claude/iflytek-digital-human/           # Claude Code 自包含插件
+├─ plugins/iflytek-digital-human/          # Codex 自包含插件
 ├─ cursor/                           # Cursor 适配包
 └─ README.md
 ```
 
 各平台只读取自己的 manifest 和包目录：
 
-- Claude Code：`claude/avatar-platform/`
-- Codex：`plugins/avatar-platform/`
+- Claude Code：`claude/iflytek-digital-human/`
+- Codex：`plugins/iflytek-digital-human/`
 - Cursor：`cursor/`
 
 ## 运行依赖

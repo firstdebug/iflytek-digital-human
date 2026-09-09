@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+PLUGIN_ROOT = Path(__file__).resolve().parents[1] / "claude" / "iflytek-digital-human"
 TOOLS_DIR = PLUGIN_ROOT / "tools"
 HOOKS_DIR = PLUGIN_ROOT / "hooks"
 sys.path.insert(0, str(TOOLS_DIR))
@@ -192,7 +192,7 @@ class ConsentNoticeTests(ConsentSandbox):
 
         self.assertIn("声明版本：2.2", rendered)
         self.assertIn("[待补充：数据处理方名称]", rendered)
-        self.assertIn("不同意不会影响 avatar-platform 的正常功能", rendered)
+        self.assertIn("不同意不会影响 iflytek-digital-human 的正常功能", rendered)
         self.assertIn("沉默、继续使用插件或关闭本提示均不视为同意", rendered)
         self.assertIn("项目目录仅在本地用于工作流接续和产物验证", rendered)
         self.assertIn("对话全文和后续 Prompt 原文不会落盘或上传", rendered)
@@ -238,7 +238,7 @@ class ConsentNoticeTests(ConsentSandbox):
         content = (PLUGIN_ROOT / "skills" / "avatar-workflow-entry" /
                    "SKILL.md").read_text(encoding="utf-8")
 
-        self.assertIn("avatar-platform consent", content)
+        self.assertIn("iflytek-digital-human consent", content)
         self.assertIn("仅当上下文中没有", content)
         self.assertIn("consent --status", content)
 
@@ -258,7 +258,7 @@ class ConsentNoticeTests(ConsentSandbox):
 class ConsentRouteHintTests(unittest.TestCase):
     def test_avatar_context_injects_fail_closed_platform_invariants(self):
         output = route_hint.build_hook_output(
-            {"prompt": "/avatar-platform:avatar-workflow-entry 我要做 Web 虚拟人，但没有 appId 和 sceneId"},
+            {"prompt": "/iflytek-digital-human:avatar-workflow-entry 我要做 Web 虚拟人，但没有 appId 和 sceneId"},
             status_provider=lambda: "accepted",
         )
 
@@ -283,23 +283,23 @@ class ConsentRouteHintTests(unittest.TestCase):
         status = mock.Mock(return_value="accepted")
 
         output = route_hint.build_hook_output(
-            {"prompt": "/avatar-platform:avatar-workflow-entry 帮我构建一个虚拟人项目"}, status_provider=status
+            {"prompt": "/iflytek-digital-human:avatar-workflow-entry 帮我构建一个虚拟人项目"}, status_provider=status
         )
 
         status.assert_called_once_with()
         context = output["hookSpecificOutput"]["additionalContext"]
-        self.assertIn("[avatar-platform consent] status=accepted", context)
+        self.assertIn("[iflytek-digital-human consent] status=accepted", context)
         self.assertIn("不要运行 telemetry.py consent --status", context)
         self.assertIn("不要向用户重复提示", context)
 
     def test_undecided_status_instructs_full_notice_and_explicit_choice(self):
         output = route_hint.build_hook_output(
-            {"prompt": "/avatar-platform:avatar-live-streaming 创建数字人直播间"},
+            {"prompt": "/iflytek-digital-human:avatar-live-streaming 创建数字人直播间"},
             status_provider=lambda: "undecided",
         )
 
         context = output["hookSpecificOutput"]["additionalContext"]
-        self.assertIn("[avatar-platform consent] status=undecided", context)
+        self.assertIn("[iflytek-digital-human consent] status=undecided", context)
         self.assertIn("telemetry.py notice", context)
         self.assertIn("docs/capabilities.md", context)
         self.assertLess(context.index("docs/capabilities.md"), context.index("telemetry.py notice"))
@@ -308,7 +308,7 @@ class ConsentRouteHintTests(unittest.TestCase):
 
     def test_stale_status_has_same_capability_and_notice_gate(self):
         output = route_hint.build_hook_output(
-            {"prompt": "/avatar-platform:avatar-live-streaming 创建虚拟人直播项目"},
+            {"prompt": "/iflytek-digital-human:avatar-live-streaming 创建虚拟人直播项目"},
             status_provider=lambda: "stale",
         )
         context = output["hookSpecificOutput"]["additionalContext"]
@@ -318,7 +318,7 @@ class ConsentRouteHintTests(unittest.TestCase):
 
     def test_declined_status_continues_without_capability_consent_gate(self):
         output = route_hint.build_hook_output(
-            {"prompt": "/avatar-platform:avatar-live-streaming 创建虚拟人直播项目"},
+            {"prompt": "/iflytek-digital-human:avatar-live-streaming 创建虚拟人直播项目"},
             status_provider=lambda: "declined",
         )
         context = output["hookSpecificOutput"]["additionalContext"]
@@ -349,8 +349,8 @@ class ConsentRouteHintTests(unittest.TestCase):
         status.assert_not_called()
 
     def test_explicit_avatar_signals_still_activate_hook(self):
-        for prompt in ("/avatar-platform:avatar-workflow-entry",
-                       "请执行 /avatar-platform:avatar-verification"):
+        for prompt in ("/iflytek-digital-human:avatar-workflow-entry",
+                       "请执行 /iflytek-digital-human:avatar-verification"):
             self.assertIsNotNone(route_hint.build_hook_output(
                 {"prompt": prompt}, status_provider=lambda: "accepted"))
 

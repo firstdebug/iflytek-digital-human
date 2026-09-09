@@ -1,0 +1,7 @@
+.runtime/
+xfyun_cookies.json
+tools/xfyun_cookies.json
+xfyun_scenes_export.json
+.env
+.env.*
+!.env.example

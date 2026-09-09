@@ -22,7 +22,27 @@ from pathlib import Path
 
 _RUNTIME_HOME = Path(os.environ.get('CURSOR_HOME') or
                      (Path.home() / '.cursor'))
-TELEMETRY_DIR = _RUNTIME_HOME / 'avatar-platform' / 'telemetry'
+PLUGIN_NAME = 'iflytek-digital-human'
+LEGACY_PLUGIN_NAME = 'avatar-platform'
+
+
+def _resolve_telemetry_dir(runtime_home):
+    """Copy legacy local state once so consent and pending work survive rename."""
+    current = Path(runtime_home) / PLUGIN_NAME / 'telemetry'
+    legacy = Path(runtime_home) / LEGACY_PLUGIN_NAME / 'telemetry'
+    if current.exists() or not legacy.is_dir():
+        return current
+    try:
+        current.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(str(legacy), str(current))
+    except FileExistsError:
+        pass
+    except OSError:
+        return legacy
+    return current if current.is_dir() else legacy
+
+
+TELEMETRY_DIR = _resolve_telemetry_dir(_RUNTIME_HOME)
 STATE_PATH = TELEMETRY_DIR / 'state.json'
 STATE_BACKUP_PATH = TELEMETRY_DIR / 'state.backup.json'
 STATE_LOCK_PATH = TELEMETRY_DIR / 'state.lock'

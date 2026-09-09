@@ -1,0 +1,26 @@
+{
+  "name": "iflytek-digital-human",
+  "description": "讯飞虚拟人交互平台全流程接入助手 - 从零代码快速搭建到 SDK/WebAPI 深度集成,支持 Web 对话模板、数字人直播、三端 SDK 开发、后端报文接入",
+  "version": "1.0.0",
+  "author": {
+    "name": "firstdebug",
+    "email": "shfan4@iflytek.com"
+  },
+  "homepage": "https://virtual-man.xfyun.cn/",
+  "repository": "https://github.com/firstdebug/avatar-platform",
+  "license": "MIT",
+  "keywords": [
+    "xfyun",
+    "avatar",
+    "digital-human",
+    "web-sdk",
+    "android-sdk",
+    "ios-sdk",
+    "webapi",
+    "live-streaming",
+    "web-template",
+    "nlp",
+    "asr",
+    "tts"
+  ]
+}

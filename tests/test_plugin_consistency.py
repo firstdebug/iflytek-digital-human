@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+PLUGIN_ROOT = Path(__file__).resolve().parents[1] / "claude" / "iflytek-digital-human"
 SKILLS_ROOT = PLUGIN_ROOT / "skills"
 TOOLS_CONFIG = PLUGIN_ROOT / "config" / "tools.yaml"
 
@@ -123,6 +123,8 @@ class NoMachineSpecificPathsTests(unittest.TestCase):
             "C:/Users/",
             "D:/avatar-platform",
             "D:\\avatar-platform",
+            "D:/iflytek-digital-human",
+            "D:\\iflytek-digital-human",
             "/home/user/",
             "~/.xfyun",
         )

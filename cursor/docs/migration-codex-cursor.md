@@ -1,6 +1,6 @@
 # 迁移到 Codex / Cursor 说明
 
-本目录是 avatar-platform 的 Cursor 适配包；Claude Code、Cursor 和 Codex 使用各自的安装目录。若从 Claude Code 源包重新生成适配包，除了执行格式转换命令外，还需处理几处平台差异。本文档说明完整步骤与已知降级项。
+本目录是 iflytek-digital-human 的 Cursor 适配包；Claude Code、Cursor 和 Codex 使用各自的安装目录。若从 Claude Code 源包重新生成适配包，除了执行格式转换命令外，还需处理几处平台差异。本文档说明完整步骤与已知降级项。
 
 ## 一、转换命令
 

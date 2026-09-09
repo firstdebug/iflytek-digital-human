@@ -9,7 +9,7 @@ tools:
   - name: tool-name
     description: 工具功能描述
     type: script | api | binary
-    path: 相对于 avatar-platform 根目录的路径
+    path: 相对于 iflytek-digital-human 根目录的路径
     input:
       param1: type
       param2: type
