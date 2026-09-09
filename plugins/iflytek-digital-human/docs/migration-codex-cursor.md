@@ -29,27 +29,29 @@ playwright install chromium   # playwright 装库后还需单独装浏览器
 
 Codex / Cursor 的运行环境不保证有 Python3 或这些库。若目标环境无法跑 Python，依赖 `tools/` 的 skill（凭据获取、知识库、直播创建等）将无法执行。
 
-### 2. Hooks 自动路由会失效（降级项）
+### 2. Hooks 接入边界
 
 Claude Code 源包的 `hooks/hooks.json` 注册了 `UserPromptSubmit` 钩子：每次用户发消息时运行 `hooks/route_hint.py`，检测“虚拟人/数字人”等关键词，自动把请求导向入口 Skill `avatar-workflow-entry`，并把本地授权状态注入上下文。
 
-这是 **Claude Code 的 Hook 机制**。Cursor 和 Codex 没有与该生命周期完全对应的 Hook，因此适配包由 `avatar-workflow-entry` 在显式调用时补偿首次能力清单、隐私声明和授权门禁：
+Claude Code 与当前稳定版 Codex 都支持这组生命周期事件。Codex 包通过根目录 `hooks.json` 注册 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` 和 `SessionEnd`；命令处理器使用 `commandWindows`、`timeout`、同步 `async: false` 和 Codex 的 `hookSpecificOutput`。`hooks/list` 返回的运行时元数据会把超时显示为 `timeoutSec`，不要反向写进配置文件。Cursor 仍不假设提供同等生命周期，因此入口 Skill 保留显式门禁作为兼容路径：
 
-| 项目 | Claude Code 源包 | Cursor / Codex 适配包 |
-|------|-------------|----------------|
-| 入口 Skill 是否存在 | 是 | 是 |
-| `UserPromptSubmit` 自动路由 | 有 | 无对应生命周期 |
-| 首次授权门禁 | Hook 注入状态 | 入口 Skill 显式执行 |
-| workflow / invocation | Hook 自动创建 | `telemetry.py start` / `invoke` 显式创建 |
-| 完成或失败 | Stop / SessionEnd + Reporter | 持有 `workflowId` 显式 `complete` / `fail` |
-| 用户体验 | 提到“虚拟人”即自动分流 | 需显式调用入口 Skill |
+| 项目 | Claude Code 源包 | Codex 适配包 | Cursor 适配包 |
+|------|-------------|----------------|----------------|
+| 入口 Skill 是否存在 | 是 | 是 | 是 |
+| `UserPromptSubmit` 自动路由 | 有 | 有 | 无对应生命周期假设 |
+| 首次授权门禁 | Hook 注入状态 | Hook 注入 + PreToolUse / Stop 阻断 + 入口回退 | 入口 Skill 显式执行 |
+| workflow / invocation | Hook 辅助记录 | Hook 辅助 + `telemetry.py start` / `invoke` 显式兜底 | 显式记录 |
+| 完成或失败 | Stop / SessionEnd + Reporter | Stop 只验证，真实完成仍走门禁和显式 `complete` / `fail` | 显式收口 |
+| 用户体验 | 提到“虚拟人”即自动分流 | 强虚拟人信号自动分流 | 需显式调用入口 Skill |
 
-**功能不会崩溃**，只是少了自动分流这一层便利。补偿方式二选一：
+Cursor 少了自动分流这一层，补偿方式二选一：
 
-- 在目标平台的 rules / system prompt 里，把“检测到虚拟人关键词 → 先走 avatar-workflow-entry”的规则写进去；
+- 在 Cursor 的 rules / system prompt 里，把“检测到虚拟人关键词 → 先走 avatar-workflow-entry”的规则写进去；
 - 或在用户文档里注明：处理虚拟人任务前需显式调用入口 Skill。
 
-显式生命周期不能模拟宿主未提供的强退事件。Cursor / Codex 进程若在收口命令前被终止，本地 workflow 保持 `in_progress`，不能自动推断成 `completed`。
+Hook 文件存在不等于已生效。Codex 首次加载或 Hook 内容变化后会进入未受信任状态，必须由用户在宿主信任界面确认；自动化环境只有在外部已经审查 Hook 来源时才能使用 `--dangerously-bypass-hook-trust`。Hook 被关闭、未受信任或 Python 不可用时，入口 Skill 的显式流程仍然有效。
+
+显式生命周期不能模拟宿主未提供的强退事件。Codex 的 `SessionEnd` 只会把未完成 workflow 收口为 `interrupted`，不会伪造成 `completed`；进程被直接杀死而来不及触发 Hook 时，本地 workflow 保持 `in_progress`。
 
 ### 3. 路径与命令假设
 

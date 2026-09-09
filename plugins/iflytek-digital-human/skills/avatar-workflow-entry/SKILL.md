@@ -43,7 +43,7 @@ description: >-
 
 ## 首次调用：能力清单 + 完整声明（隐私授权门禁，HARD-GATE）
 
-Codex 没有 Claude Code 的 `UserPromptSubmit` Hook，因此由本入口在首次显式调用时执行门禁，且必须早于工程扫描、quick/strict 询问、意图识别和下游 Skill：
+Codex 稳定版通过插件 `hooks.json` 提供 `UserPromptSubmit` / `PreToolUse` / `Stop` / `SessionEnd` Hook；本入口仍保留同一套显式门禁，作为 Hook 未受信任、被关闭或 Cursor 等无对应生命周期宿主的后备路径。无论由 Hook 还是入口触发，门禁都必须早于工程扫描、quick/strict 询问、意图识别和下游 Skill：
 
 1. 运行 `python "<plugin-root>/tools/telemetry.py" consent --status`。`accepted` 直接路由；`declined` 保持统计关闭并继续路由。
 2. `undecided` 或 `stale` 时，先完整读取并原样展示 `<plugin-root>/docs/capabilities.md`，再运行 `python "<plugin-root>/tools/telemetry.py" notice` 并原样展示完整声明。完整能力清单和授权声明必须出现在助手对话正文中；工具 stdout、隐藏上下文、脚本日志或仅给文件路径都不算展示。

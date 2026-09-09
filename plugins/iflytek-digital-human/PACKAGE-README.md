@@ -8,6 +8,8 @@ repository. It includes the runtime resources required by its Skills.
 - `.codex-plugin/plugin.json` - Codex plugin manifest.
 - `skills/` - iflytek-digital-human skills and references.
 - `.codex/agents/` - converted Codex agent definitions.
+- `hooks.json` - Codex lifecycle hook registration.
+- `hooks/` - routing, consent, response, and session guards.
 - `tools/` - Xfyun platform Python tools for login, credentials, templates,
   live projects, model management, and knowledge bases.
 - `config/` - tool registry, platform registry, and error-code mappings.
@@ -24,11 +26,15 @@ On first use, the entry skill shows the full `docs/capabilities.md` content and
 the exact `tools/telemetry.py notice` output before waiting for explicit
 telemetry consent. Declining telemetry does not disable avatar features.
 
-Codex does not run Claude Code's `UserPromptSubmit`, `Stop`, or `SessionEnd`
-hooks. Routing and lifecycle recording are therefore explicit skill actions;
-the entry skill uses `telemetry.py start`, `invoke`, and a final `complete` or
-`fail` with the returned `workflowId`. The package does not claim automatic
-per-turn hook coverage or completion after a forced host shutdown.
+Codex stable 0.146.1 loads `hooks.json` and runs this package's
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `SessionEnd` hooks.
+The hooks inject routing context, deny avatar business tools until consent is
+decided, and block a final response that hides the complete capability and
+consent notice. They never mark delivery complete: the entry skill still uses
+`telemetry.py start`, `invoke`, and a final `complete` or `fail` with the
+returned `workflowId`. When Hooks are disabled or untrusted, the same explicit
+skill lifecycle is the fallback. A forced host shutdown is not a successful
+completion signal.
 
 When a skill asks to run `python tools/...`, run it from the plugin root:
 
