@@ -1,6 +1,6 @@
 ---
 name: avatar-transparent-bg
-description: 配置讯飞虚拟人的透明背景、Alpha 渲染和自定义背景叠加。用于抠像、透明视频、Canvas 合成或解决透明区域显示异常时。
+description: 透明背景配置指南
 ---
 
 # avatar-transparent-bg: 透明背景配置
@@ -44,9 +44,8 @@ avatar.setGlobalParams({
   }
 });
 
-// 2. 播放器配置透明
-const player = avatar.player;
-player.alpha = true;  // 启用透明渲染
+// 2. 当前 Web SDK 不需要也不支持手动设置播放器 alpha。
+// XRTC 播放器收到 SDP 中的 a=xrtc-alpha 后会自动切换透明渲染。
 
 // 3. 容器样式（可选）
 // 如需叠加到其他内容上
@@ -123,17 +122,14 @@ if (avatarId.startsWith('cnr')) {
 }
 ```
 
-### 3. 双重配置
+### 3. Web 播放器行为
 
-**必须同时配置 stream 和 player**:
+Web 只配置流参数，不要虚构播放器属性：
 ```javascript
-// ❌ 错误: 只配置了一处
-stream.alpha = 1;
-// 忘记配置 player.alpha
-
-// ✓ 正确: 两处都配置
-stream.alpha = 1;
-player.alpha = true;
+avatar.setGlobalParams({
+  avatar: { stream: { protocol: 'xrtc', alpha: 1 } }
+});
+// 当前 SDK 的播放器由 SDP a=xrtc-alpha 自动启用 WebGL 透明渲染。
 ```
 
 ### 4. Android 渲染模式
@@ -180,7 +176,7 @@ if (playerParams.isBgAlpha()) {
 **检查清单**:
 - [ ] 协议是否为 `xrtc`
 - [ ] `stream.alpha` 是否为 1
-- [ ] `player.alpha` 是否为 true
+- [ ] SDP 是否包含 `a=xrtc-alpha`，容器内是否出现透明渲染 canvas
 - [ ] 形象是否为标准虚拟人（非超拟人）
 
 ### 2. 边缘有白边或黑边

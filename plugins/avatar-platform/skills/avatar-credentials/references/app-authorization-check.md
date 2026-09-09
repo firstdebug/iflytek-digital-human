@@ -4,7 +4,7 @@
 
 ## 触发时机
 
-`xfyun_common.py` 登录成功后（Cookie 路径由公共会话模块统一管理），**立即**调用此检查，**先于** `xfyun_query_services.py` 查询场景。
+`xfyun_common.py` 登录成功后(cookies 保存到 `xfyun_cookies.json`),**立即**调用此检查,**先于** `xfyun_query_services.py` 查询场景。
 
 ---
 
@@ -14,7 +14,7 @@
 
 **请求头**:
 ```
-Cookie: 由 xfyun_common.py 的公共会话自动注入
+Cookie: 从 xfyun_cookies.json 读取
 Content-Type: application/json
 ```
 
@@ -153,16 +153,18 @@ Content-Type: application/json
 ## 实现建议(Python 伪代码)
 
 ```python
-from xfyun_common import get_session
+import requests, json
 
-def check_app_authorization():
-    session = get_session()
-    if not session:
-        return None
+def check_app_authorization(cookies_path="xfyun_cookies.json"):
+    # 1. 读 cookies
+    with open(cookies_path) as f:
+        cookies = json.load(f)
 
-    resp = session.post(
+    # 2. 调接口
+    resp = requests.post(
         "https://virtual-man.xfyun.cn/zs_web/app/query",
         json={"pageNum": 1, "pageSize": 100},
+        cookies=cookies
     )
     data = resp.json()
     

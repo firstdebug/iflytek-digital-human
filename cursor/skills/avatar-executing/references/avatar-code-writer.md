@@ -12,7 +12,7 @@
 
 **禁止事项**：
 - ❌ 不读 playbook 就凭记忆/通用知识写 SDK 代码
-- 可用 `avatar-integration-guides/android.md` 快速理解，但完整实现以 playbook 和实际 SDK 产物为准
+- ❌ 不照 `avatar-integration-guides/android.md`（人工简化失真版，含不存在的 API）
 - ❌ 不用主 agent 手搓的 `sdk-api-notes.md` 之类替代 playbook（可作补充，但 playbook 优先）
 
 **Android 失真 API 黑名单（真实 SDK 中不存在，写出来必崩，写完自查 grep 必须零命中）**：
@@ -123,7 +123,8 @@ if (ContextCompat.checkSelfPermission(this, RECORD_AUDIO) != GRANTED) {
 wss://avatar.cn-huadong-1.xf-yun.com/v1/interact
 ```
 - Android: `new AvatarPlatformConfig.Builder().setServerUrl("wss://avatar.cn-huadong-1.xf-yun.com/v1/interact")`
-- Web: 初始化 config 里 `serverUrl: 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact'`
+- Web: Node 服务端持有固定 WS_URL 并生成 signedUrl；前端只调用
+  `setApiInfo({ signedUrl, appId, sceneId })`
 - iOS: `config.serverUrl = @"wss://avatar.cn-huadong-1.xf-yun.com/v1/interact"`
 
 **不设的后果**：SDK 用内置 `wss://test.xfyousheng.com/...` 测试地址，WebSocket 握手报
@@ -147,4 +148,4 @@ params.setAvatar(avatar); params.setTTS(tts);
 形象/发音人在使用前必须经 `app/auth_asset` 授权给该 appId（assetType=1形象/3发音人，
 assetScene=1）。**关键**：不同账号可授权的资产不同，**不要硬编码猜 ID**。正确做法是
 调 `xfyun_interface.py list-assets <appId>` 或授权探测，取该账号**实际授权成功**的 ID。
-首次接入使用平台默认资产；若账号返回未授权，再以实际探测结果替换。
+（历史上 live/template 工具里硬编码的 `110117026` 在部分账号会授权失败，务必以探测结果为准。）

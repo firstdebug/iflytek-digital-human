@@ -1,27 +1,53 @@
-# 路由执行流程
+# 路由流程实现
 
-## 1. 读取请求
+三步路由流程的完整代码实现。
 
-提取交付物、平台、已有工程状态、明确能力和故障信号。不要先抛出与讯飞平台无关的通用技术选型。
+## Step 1: 快速扫描工程
 
-## 2. 决定是否扫描工程
+```javascript
+// 检测 SDK 集成状态
+const sdkStatus = detectSDK();
+// not_integrated | partially_integrated | fully_integrated
 
-- 用户提供或指向已有项目：扫描依赖、配置和相关源码，识别 Web、Android、iOS 与 SDK 状态。
-- 零代码模板、直播或纯平台操作：无需扫描本地工程。
-- 纯能力咨询：无需扫描。
+// 检测平台
+const platform = detectPlatform();
+// web | android | ios | unknown
+```
 
-## 3. 选择目标
+## Step 2: 意图识别
 
-按 `routing-rules.md` 的优先级选择最具体的 `avatar-*` Skill。明确目标直接执行；只在缺少会改变交付路径的信息时提问。
+```javascript
+const intent = analyzeIntent(userRequest, sdkStatus, platform);
 
-## 4. 传递上下文
+// 输出
+{
+  type: 'troubleshooting' | 'config_adjustment' | 'first_integration' |
+        'feature_extension' | 'docs_query' | 'permission_issue' | 'network_issue',
+  confidence: 0.0 - 1.0,
+  evidence: [...],
+  suggested_route: 'avatar-troubleshoot'
+}
+```
 
-首次 SDK 自建或多能力扩展先按 `../../avatar-shared/delivery-modes.md` 选择一次快速或严格模式；用户未选择时停止，不默认 quick。向目标 Skill 传递交付模式、项目路径、平台、用户目标、错误信息、凭据状态和已完成步骤。不要要求目标 Skill 重复询问已有信息。
+## Step 3: 路由决策
 
-新增语音识别、语音问答、录音、麦克风权限或相关 UI 时，先确认语音能力和交互形态；确认后再进入 `avatar-voice-interact` 或 `avatar-permissions-setup`。
+```javascript
+// 高置信度（> 0.8）直接路由
+if (intent.confidence > 0.8) {
+  console.log(`路由到: ${intent.suggested_route}`);
+  return routeTo(intent.suggested_route, context);
+}
 
-## 5. 继续执行
+// 中置信度（0.5 - 0.8）询问确认
+if (intent.confidence > 0.5) {
+  const confirmed = await askUserConfirm(intent);
+  if (confirmed) {
+    return routeTo(intent.suggested_route, context);
+  } else {
+    return fallbackToFullWorkflow();
+  }
+}
 
-路由不是最终输出。加载目标 Skill 后继续运行脚本、修改项目或完成平台操作，直到任务完成或遇到必须由用户处理的外部阻塞。
-
-快速模式只在关键里程碑更新，不生成路由状态块、设计/计划过程文档或常规 writer-reviewer 输出。
+// 低置信度（< 0.5）使用完整工作流
+return routeTo('avatar-brainstorming', context);
+```

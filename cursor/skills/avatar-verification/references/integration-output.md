@@ -44,8 +44,6 @@ Layer 7: 运行时验证     ✅ 通过
 ════════════════════════════════════════════════════════════════
 ```
 
-Android 报告在 Layer 6 追加：Wrapper URL、Maven 镜像顺序、heap/workers/parallel、在线预热结果、离线复验结果，以及是否发生超时、后台构建或缓存锁。下载耗时与代码编译耗时分开陈述。
-
 ---
 
 # 输出
@@ -67,15 +65,4 @@ remaining_issues:
   - error: "SDK 未下载"
     fix: "执行 avatar-artifact-download"
 ready_to_deliver: false
-```
-
-## Android 无设备
-
-```yaml
-status: "pending_device_verification"
-ready_to_install: true
-ready_to_deliver: false
-remaining_issues:
-  - error: "未检测到兼容的 adb 设备，Layer 7 未执行"
-    fix: "连接 ARM Android 设备后继续安装、首帧和交互验证"
 ```

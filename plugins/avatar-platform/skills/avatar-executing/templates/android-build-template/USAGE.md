@@ -1,6 +1,6 @@
-# Android 构建模板使用指南（执行 agent）
+# Android 构建模板使用指南（avatar-code-writer 专用）
 
-快速模式由主 agent 使用本模板；严格模式可由 avatar-code-writer 使用。两种模式都必须先读 Android Playbook。
+当 avatar-code-writer 接到生成 Android 虚拟人工程的任务时，按以下步骤使用此模板：
 
 ## Step 1: 复制模板到目标目录
 
@@ -65,11 +65,10 @@ sdk.dir=C\:\\Android\\Sdk
 
 ```bash
 cd <工程根目录>
-./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain
-./gradlew :app:testDebugUnitTest :app:assembleDebug --offline --console=plain
+./gradlew assembleDebug
 ```
 
-首次在线命令用于预热依赖；成功后再运行离线命令验证缓存完整。两个命令必须串行，工具等待超时时续接原会话，不得重跑。
+预期：首次 3-5 分钟（下载 AGP + AndroidX），增量秒级。
 
 ## 关键约束（HARD-GATE）
 
@@ -86,13 +85,13 @@ cd <工程根目录>
 
 3. **credentials.json 必须加入 .gitignore**（模板已包含）
 
-4. **Gradle 稳定配置必须就位**（模板已包含）：daemon/cache 开启，单模块默认 parallel=false、workers.max=2
+4. **gradle.properties 六项配置必须就位**（模板已包含）
 
 ## 常见错误与修复
 
 | 错误 | 根因 | 修复 |
 |------|------|------|
-| 编译长时间无进展 | 下载慢、后台构建重叠、缓存锁或内存压力 | 保留原构建，按 `avatar-shared/android-gradle-stability.md` 判定阶段；禁止立即重跑 |
+| 编译 20+ 分钟 | 未用 daemon | 检查 gradle.properties 是否有 `org.gradle.daemon=true` |
 | 黑屏 | 未 setRenderArea | 用 `createPlayer("xrtc")` + `setRenderArea(容器ViewGroup)` |
 | duplicate .so | 手动放了 webrtc .so | 删除 src/main/jniLibs 下的 .so，只靠 AAR 提供 |
 | wrapper 下载失败 | 已预置 jar | 不应出现，检查模板是否完整复制 |

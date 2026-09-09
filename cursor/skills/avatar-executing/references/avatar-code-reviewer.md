@@ -14,7 +14,7 @@
 | C5 | **传递依赖齐全** | `app/build.gradle` 显式含 `okhttp` + `gson` | 启动即 `NoClassDefFoundError: okhttp3.WebSocketListener` |
 | C6 | **初始化顺序** | `setGlobalParams` 在 `setStreamPlayer` 之前；`setServerUrl` 已调用 | 顺序反=bindAvatar 失败；漏 serverUrl=600003 |
 | C7 | **Stream 挂 Avatar** | `avatar.setStream(stream)`，不是 `params.setStream(...)` 顶层 | 参数不生效 |
-| C8 | **资产有效** | 首次接入使用平台默认值；未授权时 avatarId/vcn 来自 auth-avatar 探测 | 连上即断（10120/10121） |
+| C8 | **资产来自探测** | avatarId/vcn 是 auth-avatar 探测值，非硬编码历史值（如 x4_yezi/110117026） | 连上即断（10120/10121） |
 
 > 反例记录（真实踩过）：某次评审放过了 C2（裸 writeText）和 C3（从 data 取答案），导致
 > 虚拟人能连上、会念问题，但从不基于知识库回答——RAG 整条链路形同虚设却"看起来能跑"。
@@ -91,8 +91,8 @@ avatar.setGlobalParams({
 
 **[Web] apiSecret 泄露检查（HARD）**:
 ```javascript
-// ❌ 错误: 前端直接放 apiSecret（F12 即可读取，等同泄露）
-avatar.setApiInfo({ appId, apiKey, apiSecret, sceneId });
+// ❌ 错误: 向 Web 前端的 setApiInfo 传任何 Key/Secret 或裸 server URL
+// 即使只写占位符，模型也可能把它复制进真实实现，因此这里不提供危险调用示例。
 
 // ✓ 正确: 后端签名，前端只拿 signedUrl
 avatar.setApiInfo({ signedUrl, appId, sceneId });

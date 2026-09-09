@@ -1,6 +1,6 @@
 ---
 name: avatar-text-driver
-description: 使用文本和平台 TTS 驱动讯飞虚拟人播报，不经过 NLP 对话。用于发送文本、控制播报参数、处理长文本分段或监听播报状态时。
+description: 文本驱动功能实现指南
 ---
 
 # avatar-text-driver: 文本驱动

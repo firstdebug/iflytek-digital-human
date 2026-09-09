@@ -33,13 +33,8 @@ dependencies {
 ```
 
 ### Step 4: 同步并重新编译
-确认没有正在运行的同工程 Gradle 命令，然后只执行一次：
-
-```bash
-./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain
-```
-
-不要先运行 `clean` 或 `--refresh-dependencies`。若命令等待超时，按 `../../avatar-shared/android-gradle-stability.md` 检查原进程并续接，不要启动第二个构建。
+./gradlew clean
+./gradlew assembleDebug
 
 ### Step 5: 重新安装测试
 adb install -r app/build/outputs/apk/debug/app-debug.apk

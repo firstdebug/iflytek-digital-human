@@ -171,7 +171,7 @@ tools:
       key_id: string
       value: string
     output:
-      saved_path: string  # 默认 <plugin-root>/.runtime/secrets/secrets.enc，可用环境变量覆盖
+      saved_path: string  # 默认 <plugin-root>/.runtime/secrets/secrets.enc
     security:
       sensitive_input: [value]
     required: false
@@ -187,6 +187,56 @@ tools:
       value: string
     security:
       sensitive_output: true
+    required: false
+
+  # ========== Web SDK 交付编排 ==========
+
+  - name: web-delivery
+    description: 固定执行 Web SDK 凭据、SDK、项目专属服务、端口、浏览器证据和最终完成门禁
+    type: script
+    path: tools/web_delivery.py
+    command: run
+    input:
+      project: string
+      appId: string
+      sceneId: string
+      interaction: string
+    output:
+      status: string
+      ready_to_deliver: boolean
+      port: integer
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: web-runtime-evidence
+    description: 使用独立 Playwright 浏览器点击启动并采集 Web SDK 连接、首帧和目标交互证据；禁止模型手写证据 JSON
+    type: script
+    path: tools/web_runtime_evidence.py
+    input:
+      project: string
+      url: string
+      interaction: string
+    output:
+      status: string
+      evidence: string
+      issues: array
+    security:
+      sensitive_output: false
+    required: false
+
+  - name: websocket-auth
+    description: 生成并校验 Web SDK canonical signed URL handler，禁止模型手写 HMAC
+    type: script
+    path: tools/websocket_auth.py
+    command: install
+    input:
+      project: string
+    output:
+      module: string
+      sha256: string
+    security:
+      sensitive_output: false
     required: false
 
   # ========== 知识库管理 ==========

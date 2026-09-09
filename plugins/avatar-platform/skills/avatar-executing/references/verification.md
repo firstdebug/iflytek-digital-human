@@ -10,8 +10,7 @@
 npm run build
 
 # Android
-./gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain
-./gradlew :app:testDebugUnitTest :app:assembleDebug --offline --console=plain
+./gradlew assembleDebug
 
 # iOS
 xcodebuild -scheme AvatarDemo -configuration Debug
@@ -24,7 +23,7 @@ npm run dev
 # 打开浏览器，检查控制台
 
 # Android
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+./gradlew installDebug
 adb logcat | grep AVATAR
 
 # iOS

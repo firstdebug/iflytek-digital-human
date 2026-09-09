@@ -5,20 +5,21 @@
 import json
 import os
 import time
+import webbrowser
 import requests
 from pathlib import Path
 from typing import Optional
 from playwright.sync_api import sync_playwright, BrowserContext
+from platform_endpoints import LOGIN_URL, PROJECTS_URL, SUBSCRIBE_URL
 import xfyun_secrets as xs  # 密钥安全模块
 
-LOGIN_URL = "https://passport.xfyun.cn/login"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 LOGIN_TIMEOUT = 300
 REQUIRED_COOKIES = ["ssoSessionId", "account_id"]
 
 
 def resolve_cookie_file(override: Optional[str] = None) -> Path:
-    """Resolve the shared Cookie file without depending on the working directory."""
+    """解析 Cookie 文件路径，默认在插件根目录 .runtime/，可用环境变量覆盖。"""
     configured = override if override is not None else os.environ.get("XFYUN_AVATAR_COOKIE_FILE")
     if configured:
         expanded = os.path.expandvars(os.path.expanduser(configured))
@@ -29,24 +30,81 @@ def resolve_cookie_file(override: Optional[str] = None) -> Path:
 COOKIE_FILE = resolve_cookie_file()
 
 
+def _active_cookie_file() -> Path:
+    # Keep the module-level value patchable for tests while honoring a runtime
+    # environment override when one is supplied.
+    return resolve_cookie_file() if os.environ.get('XFYUN_AVATAR_COOKIE_FILE') else COOKIE_FILE
+
+
 def save_cookies(cookie_dict: dict):
-    COOKIE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    temp_file = COOKIE_FILE.with_name(f".{COOKIE_FILE.name}.tmp")
+    """保存 Cookie 到本地文件，使用原子写入并设置权限。"""
+    cookie_file = _active_cookie_file()
+    cookie_file.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = cookie_file.with_name(f".{cookie_file.name}.tmp")
     temp_file.write_text(json.dumps(cookie_dict, ensure_ascii=False, indent=2), encoding="utf-8")
-    temp_file.replace(COOKIE_FILE)
+    temp_file.replace(cookie_file)
     try:
-        COOKIE_FILE.chmod(0o600)
+        cookie_file.chmod(0o600)
     except OSError:
         pass
-    print(f"[OK] Cookie 已保存: {COOKIE_FILE}")
+    print(f"[OK] Cookie 已保存: {cookie_file}")
+    _flush_telemetry()
+
+
+def _flush_telemetry():
+    """Flush pending local telemetry after a valid platform login is available."""
+    try:
+        from telemetry_common import can_upload, spawn_uploader
+        if can_upload():
+            spawn_uploader(force=True)
+    except Exception:
+        # Telemetry must never break login or credential retrieval.
+        pass
+
+
+def _invalidate_cookies():
+    """Remove the local Cookie file after the platform rejects the session."""
+    try:
+        _active_cookie_file().unlink(missing_ok=True)
+    except TypeError:
+        # Python 3.7 compatibility: unlink(missing_ok=...) is unavailable.
+        try:
+            _active_cookie_file().unlink()
+        except FileNotFoundError:
+            pass
+    except OSError:
+        try:
+            _active_cookie_file().write_text("{}", encoding="utf-8")
+        except OSError:
+            pass
+
+
+def handle_json_response(data, debug=False):
+    """Apply the shared login-expiry and telemetry rules to a JSON response."""
+    if debug:
+        print("\n[调试] 返回数据:")
+        print(json.dumps(xs.mask_dict(data), ensure_ascii=False, indent=2))
+    if isinstance(data, dict) and data.get("code") == 80000:
+        _invalidate_cookies()
+        print("[警告] 登录已失效，已清除本地 Cookie，请重新运行以登录")
+        return None
+    try:
+        from telemetry_common import increment_session_request
+        increment_session_request('platform_ok')
+    except Exception:
+        pass
+    _flush_telemetry()
+    return data
 
 
 def load_cookies() -> Optional[dict]:
-    if not COOKIE_FILE.exists():
+    cookie_file = _active_cookie_file()
+    if not cookie_file.exists():
         return None
     try:
-        cookie_dict = json.loads(COOKIE_FILE.read_text(encoding="utf-8"))
-        if all(name in cookie_dict for name in REQUIRED_COOKIES):
+        cookie_dict = json.loads(cookie_file.read_text(encoding="utf-8"))
+        if (isinstance(cookie_dict, dict) and
+                all(cookie_dict.get(name) for name in REQUIRED_COOKIES)):
             print("[OK] 已加载本地 Cookie")
             return cookie_dict
     except Exception:
@@ -82,7 +140,7 @@ def _wait_for_login(context: BrowserContext, timeout: int) -> Optional[dict]:
         for c in context.cookies():
             if c["name"] in REQUIRED_COOKIES:
                 found[c["name"]] = c["value"]
-        if all(name in found for name in REQUIRED_COOKIES):
+        if all(found.get(name) for name in REQUIRED_COOKIES):
             print("[OK] 登录成功！")
             return found
         time.sleep(1)
@@ -113,7 +171,8 @@ def get_session(force_login: bool = False) -> Optional[requests.Session]:
         if not cookie_dict:
             return None
         save_cookies(cookie_dict)
-    return build_session(cookie_dict)
+    session = build_session(cookie_dict)
+    return session
 
 
 def post(session: requests.Session, url: str, payload: dict, debug: bool = False) -> Optional[dict]:
@@ -124,14 +183,7 @@ def post(session: requests.Session, url: str, payload: dict, debug: bool = False
             print(f"[错误] {url} HTTP {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
-        if debug:
-            print(f"\n[调试] {url} 返回:")
-            # 自动脱敏敏感字段
-            print(json.dumps(xs.mask_dict(data), ensure_ascii=False, indent=2))
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {COOKIE_FILE} 后重新运行")
-            return None
-        return data
+        return handle_json_response(data, debug=debug)
     except Exception as e:
         print(f"[错误] 请求 {url} 异常: {e}")
         return None
@@ -145,14 +197,7 @@ def get(session: requests.Session, url: str, params: dict = None, debug: bool = 
             print(f"[错误] {url} HTTP {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
-        if debug:
-            print(f"\n[调试] {url} 返回:")
-            # 自动脱敏敏感字段
-            print(json.dumps(xs.mask_dict(data), ensure_ascii=False, indent=2))
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {COOKIE_FILE} 后重新运行")
-            return None
-        return data
+        return handle_json_response(data, debug=debug)
     except Exception as e:
         print(f"[错误] 请求 {url} 异常: {e}")
         return None
@@ -166,14 +211,7 @@ def put(session: requests.Session, url: str, payload: dict, debug: bool = False)
             print(f"[错误] {url} HTTP {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
-        if debug:
-            print(f"\n[调试] {url} 返回:")
-            # 自动脱敏敏感字段
-            print(json.dumps(xs.mask_dict(data), ensure_ascii=False, indent=2))
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {COOKIE_FILE} 后重新运行")
-            return None
-        return data
+        return handle_json_response(data, debug=debug)
     except Exception as e:
         print(f"[错误] 请求 {url} 异常: {e}")
         return None
@@ -187,13 +225,7 @@ def delete(session: requests.Session, url: str, debug: bool = False) -> Optional
             print(f"[错误] {url} HTTP {resp.status_code}: {resp.text[:200]}")
             return None
         data = resp.json()
-        if debug:
-            print(f"\n[调试] {url} 返回:")
-            print(json.dumps(xs.mask_dict(data), ensure_ascii=False, indent=2))
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {COOKIE_FILE} 后重新运行")
-            return None
-        return data
+        return handle_json_response(data, debug=debug)
     except Exception as e:
         print(f"[错误] 请求 {url} 异常: {e}")
         return None
@@ -261,8 +293,6 @@ def check_app_capability(app, capability_type):
 
 def open_subscribe_page():
     """打开订阅页面（复用登录态）"""
-    SUBSCRIBE_URL = "https://virtual-man.xfyun.cn/console/applications/subscribe"
-
     print(f"\n[跳转浏览器] 订阅页面")
     print(f"     {SUBSCRIBE_URL}")
 
@@ -306,13 +336,23 @@ def open_subscribe_page():
         print(f"请手动访问: {SUBSCRIBE_URL}")
 
 
+def open_projects_page():
+    """Use the system browser to open the canonical virtual-man console."""
+    print("\n[跳转浏览器] 虚拟人项目控制台")
+    print(f"     {PROJECTS_URL}")
+    if not webbrowser.open(PROJECTS_URL):
+        print(f"[警告] 浏览器未自动打开，请访问: {PROJECTS_URL}")
+
+
 def _cli(argv) -> int:
     """命令行入口。
 
     用法:
-      python tools/xfyun_common.py [login]     # 拉起浏览器登录并保存 Cookie
-      python tools/xfyun_common.py cookie-path # 显示当前 Cookie 文件路径
-      python tools/xfyun_common.py subscribe   # 打开订阅页面（复用登录态）
+      python tools/xfyun_common.py [login]   # 拉起浏览器登录，保存到 <plugin-root>/.runtime/xfyun_cookies.json（默认）
+      python tools/xfyun_common.py projects  # 打开虚拟人项目控制台
+      python tools/xfyun_common.py subscribe # 打开订阅页面（复用登录态）
+
+    Cookie 路径可用环境变量 XFYUN_AVATAR_COOKIE_FILE 覆盖为完整路径。
     """
     cmd = argv[1] if len(argv) > 1 else "login"
 
@@ -324,8 +364,8 @@ def _cli(argv) -> int:
         open_subscribe_page()
         return 0
 
-    if cmd == "cookie-path":
-        print(COOKIE_FILE)
+    if cmd == "projects":
+        open_projects_page()
         return 0
 
     if cmd == "login":

@@ -18,6 +18,18 @@ repository. It includes the runtime resources required by its Skills.
 The entry skill is `avatar-workflow-entry`. For virtual-human or digital-human
 tasks, start from that skill so it can route to the correct expert skill.
 
+Version `1.1.0` stores local telemetry state under
+`~/.codex/avatar-platform/telemetry` and reports `agent=codex`.
+On first use, the entry skill shows the full `docs/capabilities.md` content and
+the exact `tools/telemetry.py notice` output before waiting for explicit
+telemetry consent. Declining telemetry does not disable avatar features.
+
+Codex does not run Claude Code's `UserPromptSubmit`, `Stop`, or `SessionEnd`
+hooks. Routing and lifecycle recording are therefore explicit skill actions;
+the entry skill uses `telemetry.py start`, `invoke`, and a final `complete` or
+`fail` with the returned `workflowId`. The package does not claim automatic
+per-turn hook coverage or completion after a forced host shutdown.
+
 When a skill asks to run `python tools/...`, run it from the plugin root:
 
 ```powershell

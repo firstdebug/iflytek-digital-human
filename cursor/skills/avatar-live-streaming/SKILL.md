@@ -1,15 +1,18 @@
 ---
 name: avatar-live-streaming
-description: 创建并发布讯飞数字人直播项目，配置直播场景、商品、分镜和脚本。用于用户明确提出虚拟主播、营销直播或带货直播需求时。
+description: 虚拟人直播项目（营销带货）创建工具。由 avatar-workflow-entry 路由调用。触发条件：已明确要创建直播项目，需配置商品/分镜/脚本。
 ---
 
 # avatar-live-streaming: 虚拟人直播项目
 
-## 运行位置
+## ⚙️ 运行位置（从任意项目调用时必读）
 
-从本文件路径 `<plugin-root>/skills/avatar-live-streaming/SKILL.md` 反推 `<plugin-root>`。
-脚本 `tools/xfyun_live.py` 和配置 `config/tools.yaml` 均以插件根目录为基准；不要依赖用户名、当前工作目录或固定安装路径。
-执行命令时将工作目录设为 `<plugin-root>`，或使用解析后的绝对路径。
+本 skill 依赖的平台脚本与配置在固定位置：
+- 工具根目录：`<plugin-root>`（插件安装目录，Cursor 自动解析为真实路径）
+- 脚本 `tools/xfyun_live.py` · 工具注册表 `config/tools.yaml`
+
+正文中的 `python tools/xxx.py` 等**相对路径均以该根目录为基准**。
+从其他项目目录执行时，先 `cd "<plugin-root>"` 再运行，或改用绝对路径前缀。
 依赖：Python 3.8+ 与 requests/playwright/cryptography；首次使用需浏览器登录（见 avatar-credentials）。
 
 ## 定位
@@ -28,7 +31,7 @@ description: 创建并发布讯飞数字人直播项目，配置直播场景、�
 ## 核心工作流
 
 ```bash
-# 创建直播项目（一条龙，使用平台默认形象和发音人）
+# 创建直播项目（一条龙，默认形象晓姿/发音人灵小琪）
 python tools/xfyun_live.py create <appId> "直播间名称" --desc "描述"
 
 # 自定义形象和发音人
@@ -67,7 +70,7 @@ python tools/xfyun_live.py query <sceneId>
 
 之后自动发布 → 打开直播间链接 + 配置页面。
 
-**默认配置**: 形象 `111310001`｜发音人 `x4_lingxiaoqi_oral`｜商品/分镜/脚本各 1 个（脚本已启用）。
+**默认配置**: 形象 晓姿-蓝色制服 `110117026`｜发音人 灵小琪 `x4_lingxiaoqi_oral`｜商品/分镜/脚本各 1 个（脚本已启用）。
 
 ---
 
@@ -77,7 +80,7 @@ python tools/xfyun_live.py query <sceneId>
 2. **资产授权自动处理** — 发音人/形象授权失败会警告但继续；部分资产可能需人工授权
 3. **发布后即可访问** — 创建流程末尾自动发布，直接打开直播间链接看效果
 4. **场景配额限制** — 报"超过场景授权数量"说明账号配额满，需先删旧场景
-5. **浏览器免登录** — 复用 `xfyun_common.py` 管理的公共 Cookie 登录态
+5. **浏览器免登录** — 复用 `xfyun_cookies.json` 登录态
 
 ---
 
@@ -91,10 +94,24 @@ python tools/xfyun_live.py query <sceneId>
 
 ---
 
+## 交付收尾（必做）
+
+直播间创建并发布后，记录交付物并上报完成：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"live_url": "<直播间链接>", "anchor_id": "<anchorId>"}
+EOF
+python "<plugin-root>/tools/telemetry.py" complete --type live_streaming
+```
+
+未发布成功时**不要**执行。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 appId 等凭据
 - `avatar-model-config`: 确认/配置对话能力
 - `avatar-web-template`: 非直播的 Web 对话模板应用
 - `avatar-config-authoring`: 直播间形象/背景等配置调整
-

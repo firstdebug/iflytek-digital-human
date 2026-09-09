@@ -1,21 +1,101 @@
-# 路由目标
+# 路由目标说明
 
-| Skill | 最小输入 | 主要输出 |
-|---|---|---|
-| `avatar-troubleshoot` | 平台、现象、错误码或日志 | 根因、修复和验证结果 |
-| `avatar-permissions-setup` | 平台、权限类型 | 权限声明、运行时处理和验证 |
-| `avatar-network-debug` | 连接现象、错误码、网络环境 | 网络诊断与修复 |
-| `avatar-config-authoring` | 当前项目、目标参数 | 配置修改与影响说明 |
-| `avatar-credentials` | 目标项目或平台操作 | 已验证凭据和环境变量 |
-| `avatar-web-template` | appId、模板需求 | 已发布 Web 模板链接 |
-| `avatar-live-streaming` | 直播场景、商品和脚本需求 | 已配置并发布的直播项目 |
-| `avatar-webapi-protocol` | 后端语言、协议目标 | 可运行报文示例和协议校验 |
-| `avatar-knowledge-base` | 场景、文档和检索需求 | 知识库、关联配置和发布状态 |
-| `avatar-model-config` | 场景与目标模型 | 模型绑定、配置和发布状态 |
-| `avatar-brainstorming` | 交付形态、平台、核心能力、交付模式 | 快速实施摘要或 `design-spec.md` |
-| `avatar-planning` | 严格模式的已确认设计规格 | `implementation-plan.md`；快速模式跳过 |
-| `avatar-executing` | 快速实施摘要，或严格设计规格与计划 | 可构建、可运行工程 |
-| `avatar-verification` | 已实现项目 | 交付验证结果和必要修复 |
-| 能力类 Skill | 已有项目和单一能力目标 | 对应能力实现与验证 |
+各路由目标的适用场景、输入、输出说明。
 
-能力类 Skill 包括 `avatar-text-driver`、`avatar-text-interact`、`avatar-audio-driver`、`avatar-voice-interact`、`avatar-full-duplex`、`avatar-action-control`、`avatar-subtitle-setup` 和 `avatar-transparent-bg`。
+## 1. avatar-troubleshoot (故障排查)
+
+**适用场景**:
+- 虚拟人黑屏/无声音
+- 错误码诊断
+- 日志分析
+
+**输入**:
+```yaml
+error_code: "10113"
+error_message: "apiSecret 错误"
+platform: "web"
+logs: "..."
+```
+
+**输出**: 诊断结果 + 修复建议
+
+---
+
+## 2. avatar-config-authoring (配置调整)
+
+**适用场景**:
+- 修改分辨率、码率、帧率
+- 更换形象或声音
+- 调整播报速度、音量
+
+**输入**:
+```yaml
+config_type: "resolution" | "avatar_resource" | "tts_params"
+current_value: "720x1280"
+target_value: "1080x1920"
+```
+
+**输出**: 配置文件修改 + 影响说明
+
+---
+
+## 3. avatar-brainstorming (完整工作流)
+
+**适用场景**:
+- 首次接入
+- 功能扩展
+- 复杂需求
+
+**输入**:
+```yaml
+task_type: "first_integration" | "feature_extension"
+platform: "web" | "android" | "ios"
+user_requirements: "..."
+```
+
+**输出**: 设计文档 → 实现计划 → 代码实现
+
+---
+
+## 4. avatar-permissions-setup (权限配置)
+
+**适用场景**:
+- 麦克风权限拒绝
+- 运行时权限申请
+- Info.plist / AndroidManifest 配置
+
+**输入**:
+```yaml
+platform: "android" | "ios" | "web"
+permission_type: "microphone" | "camera"
+error_info: "..."
+```
+
+**输出**: 权限配置代码 + 引导流程
+
+---
+
+## 5. avatar-network-debug (网络诊断)
+
+**适用场景**:
+- WebSocket 连接失败
+- 流媒体不可达
+- 网络超时
+
+**输入**:
+```yaml
+error_code: "10200" | "10201"
+network_info: "..."
+```
+
+**输出**: 网络诊断结果 + 修复建议
+
+---
+
+## 6. provide_docs (文档提供)
+
+**适用场景**:
+- 仅需查阅文档
+- 无明确实施意图
+
+**输出**: 相关文档链接 + 简要说明

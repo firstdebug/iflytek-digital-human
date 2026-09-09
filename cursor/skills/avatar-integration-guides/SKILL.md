@@ -1,7 +1,8 @@
 ---
 name: avatar-integration-guides
 description: >-
-  提供讯飞虚拟人 Web、Android 和 iOS SDK 的概念索引与最小接入形态。仅用于快速理解平台结构；构建可交付工程时必须改用 avatar-executing 的真实 API playbook。
+  三端（Web / Android / iOS）虚拟人 SDK 的"五分钟快速理解"集成指南索引。用于快速了解某一平台的最小接入形态；真正构建可交付工程时以
+  avatar-executing 的 build-playbook 为准。
 ---
 
 # avatar-integration-guides: 三端集成指南索引
@@ -20,7 +21,7 @@ description: >-
 |------|------|------|
 | Web | `web.md` | 五分钟最小示例，生产以 web-sdk-build-playbook 为准 |
 | iOS | `ios.md` | 原生 iOS 集成快速指南 |
-| Android | `android.md` | 已按 avatar-core-v3.2.7 真实 API 校正；完整构建流程仍以 Android playbook 为准 |
+| Android | `android.md` | 已遗弃，唯一权威流程见 `../avatar-executing/references/android-sdk-build-playbook.md` |
 
 ## 使用建议
 

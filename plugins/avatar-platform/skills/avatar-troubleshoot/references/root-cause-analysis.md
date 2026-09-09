@@ -75,24 +75,3 @@
 修复难度: 高
 修复方式: 需要用户手动配置环境
 ```
-# Android Gradle 根因分类
-
-```yaml
-下载与仓库:
-  证据: Wrapper banner 前无进展，或依赖解析阶段网络等待
-  修复: 验证腾讯 Wrapper；Maven 使用阿里、腾讯、华为、官方兜底
-
-活动构建与缓存锁:
-  证据: 已有 Gradle/Java 进程，产物时间仍更新，或日志显示 Waiting to acquire lock
-  修复: 续接原会话；仅在确认无活动任务后 gradlew --stop
-
-内存与 worker:
-  证据: daemon disappeared、频繁 GC、系统换页、多个并发构建
-  修复: Xmx1280m、parallel=false、workers.max=2，并结束重复构建
-
-冷缓存:
-  证据: 首次在线慢，成功后的离线增量构建很快
-  修复: 保留缓存；在线预热后离线复验，不清理依赖
-```
-
-完整决策流程见 `../../avatar-shared/android-gradle-stability.md`。

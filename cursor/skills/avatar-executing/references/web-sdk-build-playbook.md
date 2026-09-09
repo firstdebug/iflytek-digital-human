@@ -51,7 +51,8 @@ Web 工程**必须**是"Node 后端 + 静态前端"，**禁止**纯静态页面�
 
 ```
 project/
-├── server.js          # Node/Express：① 服务端 HMAC 签名 ② 托管静态资源 ③ 下发非敏感配置
+├── server.js          # Node/Express：挂载 canonical handler、托管静态资源
+├── xfyun-auth.mjs     # 由 websocket_auth.py 生成并校验哈希；读取 env、生成 signedUrl
 ├── package.json       # type:module, 依赖 express + dotenv
 ├── .env               # 凭据（必须进 .gitignore）
 ├── .gitignore         # 必含 .env / node_modules
@@ -64,6 +65,20 @@ project/
 
 **理由**：`apiSecret` 一旦进前端 bundle，任何人 F12 就能拿到，等同泄露。服务端签名后前端只持有
 一次性 `signedUrl`（会话级有效），是唯一合规做法。详见 `rules/avatar-domain/sdk-conventions.md` 安全约束。
+
+**签名实现禁止手写**。`web_delivery.py` 会调用 `websocket_auth.py install` 生成 canonical 模块。
+`server.js` 只保留以下挂载，不得出现 `createHmac()` 或自行拼 authorization：
+
+```javascript
+import { avatarAuthHandler, avatarConfigHandler } from './xfyun-auth.mjs';
+
+app.get('/api/config', avatarConfigHandler);
+app.get('/api/avatar-auth', avatarAuthHandler);
+```
+
+模块从 dotenv 已加载的 `process.env` 读取 `APP_ID/API_KEY/API_SECRET/SCENE_ID/AVATAR_ID/VCN/WS_URL`；
+Key 和 Secret 必须都是完整 32 位，`WS_URL` 必须是 `wss://.../v1/interact`。最终 gate 会按 `.env`
+中的 Secret 重新计算 HMAC，并核对 signed URL 的 host、path、date、headers 和 signature。
 
 ---
 
@@ -80,13 +95,16 @@ project/
 
 **HARD-GATE**：Step 4 生成的 `setGlobalParams` **必须**逐项对照 §3 锁定表，不允许自由发挥字段结构。
 
-Step 2 必须执行并检查退出码，不能改写成手动下载说明：
+Step 1-2 必须由确定性编排器执行并检查退出码，不能改写成手动下载说明：
+
+运行前主 agent 必须先 Read `../../avatar-credentials/SKILL.md`、`../../avatar-artifact-download/SKILL.md` 和
+`../../avatar-network-debug/references/auth-verification.md`。这些是实际 Skill/参考读取，不能用状态机内部的 Python 调用冒充 invocation。
 
 ```bash
-python "<plugin-root>/tools/sdk_artifact.py" ensure --platform web --project "<project>"
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<text|voice|audio>"
 ```
 
-返回 `blocked_missing_sdk` 或非零退出码时，保持当前 workflow 进行中并修复下载条件；不得继续宣称项目完成。下载后先读实际 `esm/index.d.ts`，确认默认导出与方法签名：
+返回 `blocked_missing_sdk` 或其它非零退出码时，保持当前 workflow 进行中并修复确定性阻塞；不得继续宣称项目完成。下载后先读实际 `esm/index.d.ts`，确认默认导出与方法签名：
 
 ```javascript
 const module = await import(sdkUrl);
@@ -167,7 +185,7 @@ avatar.setGlobalParams({
 **必须监听的 4 个事件**（缺一不可）：`connected` / `error` / `disconnected` / `stream_start`。
 **必须处理**浏览器自动播放限制：监听 `PlayerEvents.playNotAllowed`，引导用户点击后 `player.resume()`。
 
-服务端签名必须先全文读取 `../../avatar-network-debug/references/auth-verification.md` 并复用其中的 request-line 规则。签名原文必须包含 `GET ${path} HTTP/1.1`，Authorization 的 `headers` 必须是 `host date request-line`。修改后立即运行 `node --check server.js`，不能在未启动检查的情况下继续。
+服务端签名格式仍以 `../../avatar-network-debug/references/auth-verification.md` 为准，但实现只允许使用 canonical `xfyun-auth.mjs`。修改路由后立即运行 `node --check server.js`，不能在未启动检查的情况下继续。
 
 ---
 
@@ -181,6 +199,7 @@ avatar.setGlobalParams({
 [ ] 前端 bundle 中 grep 不到 apiSecret（安全验证）
 
 浏览器（localhost 或 HTTPS）：
+[ ] 第一项先查本轮证据无 avatar authentication failed / authorization invalid / 1008 / 10110 / 10113 / 10114 / 10120 / 10121 / 11203
 [ ] 点击启动 → 收到 SDKEvents.connected
 [ ] 收到 SDKEvents.stream_start（云端推流）
 [ ] 播放器首帧渲染（PlayerEvents.play/playing）
@@ -191,13 +210,16 @@ avatar.setGlobalParams({
 
 **若任一项失败**：先查 §0 根因表和 §3 锁定表，**不要**盲目改字段试错。
 
-浏览器测试必须把本轮真实事件写入 `.runtime/web-runtime-evidence.json`，至少包含 `source=playwright|browser`、`connected`、`stream_start`、`first_frame`、目标交互与错误列表；不得手写通过值。完成后执行：
+浏览器测试必须通过 `<plugin-root>/tools/web_runtime_evidence.py` 自动生成 `.runtime/web-runtime-evidence.json`。当 `web_delivery.py run` 返回 `awaiting_runtime_verification` 时，只执行返回 JSON 中 `next_action.commands[0]` 的证据采集命令；脚本会打开本轮 URL、点击启动按钮、等待 `connected / stream_start / first_frame`、执行目标交互，并写入 `prepared_at_epoch`、`credential_fingerprint`、`url`、目标交互和浏览器错误。不得由模型判断或手写 JSON 代替脚本采集。完成后再次运行同一个 `web_delivery.py run` 命令，状态机内部才允许执行最终 gate 和完成上报：
 
 ```bash
-python "<plugin-root>/tools/web_sdk_gate.py" check --project "<project>" --interaction "<text|voice|audio>"
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --interaction "<text|voice|audio>"
 ```
 
-退出码 2 表示静态失败，3 表示 `needs_runtime_verification`，0 才表示 `ready_to_deliver`。Quick 与 Strict 都执行；Quick 只省略过程文档和常规 reviewer。
+命中上述鉴权拒绝时，即使 `connected`、首帧或交互字段为 true，最终门禁也必须先返回
+`authentication_failed`，执行 `avatar-troubleshoot/references/authentication-failed.md`，不得进入完成状态。
+
+退出码 2 表示阻塞，3 表示 `needs_runtime_verification`，0 才表示 `ready_to_deliver`。Quick 与 Strict 都执行；Quick 只省略过程文档和常规 reviewer。模型不得手写运行证据、直接调用 gate 或直接调用 `telemetry.py complete`。
 
 ---
 

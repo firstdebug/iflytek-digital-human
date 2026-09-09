@@ -245,7 +245,7 @@ if [ -f tools/auto-login.js ]; then
     echo "✅ 检测到自动登录工具"
     
     # 询问用户
-    # （通过交互提问或直接执行）
+    # (通过 平台交互提问 或直接执行)
     
     # 调用工具
     result=$(USERNAME="$user" PASSWORD="$pass" node tools/auto-login.js 2>&1)

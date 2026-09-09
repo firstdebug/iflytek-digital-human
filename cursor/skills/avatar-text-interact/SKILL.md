@@ -1,6 +1,6 @@
 ---
 name: avatar-text-interact
-description: 实现讯飞虚拟人的文本交互和 NLP 或大模型对话链路。用于发送用户问题、接收模型回复、关联知识库或处理函数调用时。
+description: 文本交互（NLP/大模型对话）功能实现指南
 ---
 
 # avatar-text-interact: 文本交互（NLP）

@@ -1,7 +1,8 @@
 ---
 name: avatar-config-authoring
 description: >-
-  调整已接入讯飞虚拟人的分辨率、码率、帧率、形象、发音人、TTS 参数或背景。用于主动修改工作中的项目配置；出现错误、黑屏或连接失败时改用 avatar-troubleshoot。
+  虚拟人配置调整（分辨率/码率/帧率/形象/发音人/TTS
+  参数/背景）。针对已集成的项目做主动的配置修改，区别于故障排查（avatar-troubleshoot）。
 ---
 
 # avatar-config-authoring: 配置调整

@@ -1,3 +1,7 @@
+"""运行数据与凭据安全测试。
+
+对应 Codex 侧 tests/test_runtime_security.py，路径断言改为 Claude 技能包根目录。
+"""
 import os
 import sys
 import tempfile
@@ -134,7 +138,8 @@ class WriteEnvHelpersTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_file = Path(temp_dir) / "nested" / ".env"
-            with mock.patch.object(write_env_safe, "get_session", return_value=FakeSession()):
+            with mock.patch.object(write_env_safe.xc, "get_session", return_value=FakeSession()), \
+                    mock.patch.object(write_env_safe.xc, "post", return_value=FakeResponse.json()):
                 self.assertTrue(
                     write_env_safe.write_env("target", "scene", output_file)
                 )
@@ -143,6 +148,16 @@ class WriteEnvHelpersTests(unittest.TestCase):
             self.assertIn("XF_API_KEY=target-key-value", content)
             self.assertIn("XF_API_SECRET=target-secret-value", content)
             self.assertNotIn("wrong-key", content)
+
+
+class QueryServicesReusesCommonSessionTests(unittest.TestCase):
+    def test_query_services_does_not_duplicate_login_stack(self):
+        source = (TOOLS_DIR / "xfyun_query_services.py").read_text(encoding="utf-8")
+        self.assertIn("import xfyun_common as xc", source)
+        self.assertIn("xc.get_session()", source)
+        # 重复的登录/Cookie 实现必须已删除，避免两套登录态互相覆盖
+        for duplicated in ("def do_browser_login", "def wait_for_login", "def save_cookies"):
+            self.assertNotIn(duplicated, source)
 
 
 if __name__ == "__main__":

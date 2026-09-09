@@ -1,7 +1,9 @@
 ---
 name: avatar-toolchain
 description: >-
-  检查讯飞虚拟人 Web、Android 或 iOS 项目的构建工具和运行环境，并汇总 all_ok、warnings 或 critical_issues。用于 avatar-preflight 的工具链检查或单独诊断开发环境时。
+  由 avatar-preflight Layer 5 调用，按 platform 参数走 web / android / ios
+  分支做工具链与运行环境检查，逐项检查后经 summarizeStatus 汇总，输出 all_ok / warnings / critical_issues
+  三态之一。
 ---
 
 # avatar-toolchain: 平台工具链检查
@@ -48,7 +50,7 @@ description: >-
 | platform | 参考文件 | 载荷内容 |
 |----------|----------|----------|
 | web | `references/web-checks.md` | Node.js / 包管理器 / 构建工具 / HTTPS / ESM / 浏览器 / 静态服务器 的检查项、检测实现、修复模板、状态分类 |
-| android | `references/android-checks.md` | Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查 |
+| android | `references/android-checks.md` | Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查。构建执行、超时处理和离线验收必须遵循 `../avatar-shared/android-gradle-stability.md` |
 | ios | `references/ios-checks.md` | Xcode / Deployment Target / CocoaPods / Framework / 系统库 / Build Settings / Info.plist / 签名 的检查项、检测实现、修复模板、状态分类，及常见问题排查 |
 
 场景细分（在选定 platform reference 内进一步定位）：
@@ -57,7 +59,6 @@ description: >-
 - 需要完整编排流程（主 `check*Toolchain` 函数）与该平台状态分类 → 对应 platform reference 的「完整检查流程 / 状态分类」小节。
 - 需要输出格式示例（成功 / 警告 / 关键问题） → 对应 platform reference 的「输出格式」小节。
 - 遇到运行 / 编译报错（Android：Gradle 同步、AAR 未识别、UnsatisfiedLinkError；iOS：dyld 加载失败、签名失败、Bitcode 错误、录音崩溃） → 对应 platform reference 的「常见问题修复」小节。
-- Android 出现 Wrapper/依赖下载慢、daemon 重叠、缓存锁、内存压力或命令超时 → 必读 `../avatar-shared/android-gradle-stability.md`。
 
 ---
 
@@ -127,7 +128,6 @@ function summarizeStatus(checks) {
 
 - **Web**：录音场景下 HTTPS 缺失（非 localhost / 非 HTTPS）为 critical；ESM 未配置为 warning（SDK 为 ESM 格式）。
 - **Android**：`minSdkVersion 21` 为硬性要求，< 21 判 critical；Gradle / Android SDK / JDK 任一未装判 critical；必需依赖 okhttp（3.11.0+）缺失判 critical；SDK 仅支持 ABI `armeabi-v7a` / `arm64-v8a`；`jniLibs.srcDirs = ['libs']` 为加载 so 库的必需配置。
-- **Android 构建稳定性**：单一 Gradle 调用、国内镜像顺序、保守内存/worker 配置和冷缓存在线预热为 HARD-GATE；不得在命令超时后并发重跑。
 - **iOS**：macOS 专属；Deployment Target ≥ 11.0（低于判 critical）；Framework 必须 `Embed & Sign`（未嵌入导致 `dyld: Library not loaded`）；`Enable Bitcode = NO`；`VALID_ARCHS = arm64`；录音功能必须配置 `NSMicrophoneUsageDescription`。
 
 ---
@@ -137,8 +137,7 @@ function summarizeStatus(checks) {
 | 文件 | 内容 |
 |------|------|
 | `references/web-checks.md` | Web 平台 7 项检查（Node.js / 包管理器 / 构建工具 / HTTPS / ESM / 浏览器 / 静态服务器）：检查方法、判断逻辑、修复模板、`checkWebToolchain` 编排、状态分类、输出格式 |
-| `references/android-checks.md` | Android 平台 9 项检查（Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 稳定性 / 签名）：检查方法、修复模板、编排、状态分类、输出格式和常见问题修复 |
-| `../avatar-shared/android-gradle-stability.md` | Android Gradle 镜像、缓存、daemon、锁、内存、超时与离线验收的统一规范 |
+| `references/android-checks.md` | Android 平台 8 项检查（Gradle / SDK / JDK / NDK / ABI / 依赖 / 构建配置 / 签名）：bash 检查方法、YAML 要求、JS 判断、修复 / 配置模板、`checkAndroidToolchain` 编排、状态分类、输出格式、常见问题修复 |
 | `references/ios-checks.md` | iOS 平台 8 项检查（Xcode / Deployment Target / CocoaPods / Framework / 系统库 / Build Settings / Info.plist / 签名）：检测代码、要求、修复建议、`checkIOSToolchain` 编排、状态分类、输出格式、常见问题修复 |
 
 ---
@@ -156,9 +155,6 @@ function summarizeStatus(checks) {
 
 **Android**
 - [ ] Gradle ≥ 7.0（推荐 7.4+）
-- [ ] 同一工程没有重叠 Gradle 调用；超时后不会直接重跑
-- [ ] Wrapper 与 Maven 镜像可达，官方仓库只作兜底
-- [ ] 单模块/内存未知时使用 parallel=false、workers.max=2 的保守配置
 - [ ] ANDROID_HOME 已配置，minSdkVersion ≥ 21
 - [ ] JDK ≥ 8（推荐 11/17）
 - [ ] 必需依赖 okhttp ≥ 3.11.0 已引入

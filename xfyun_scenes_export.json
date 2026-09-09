@@ -1,0 +1,26 @@
+[
+  {
+    "sceneName": "虚拟人Web对话项目",
+    "sceneId": "352738410059927552",
+    "appId": "c2f5675c",
+    "sceneType": 1,
+    "apiKey": "822b********73d8",
+    "apiSecret": "YjNm********NGU3"
+  },
+  {
+    "sceneName": "语音虚拟人对话",
+    "sceneId": "352649730934837248",
+    "appId": "c2f5675c",
+    "sceneType": 1,
+    "apiKey": "822b********73d8",
+    "apiSecret": "YjNm********NGU3"
+  },
+  {
+    "sceneName": "场景测试",
+    "sceneId": "347939635848155136",
+    "appId": "0fb82a03",
+    "sceneType": 1,
+    "apiKey": "21d3********18f1",
+    "apiSecret": "OWY1********YjFl"
+  }
+]

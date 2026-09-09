@@ -48,70 +48,30 @@ def query_scenes(session: requests.Session):
     print("[查询] 场景列表...")
     print("="*60)
 
-    try:
-        resp = session.post(API_SCENE_QUERY, json={
-            "sceneType": 1,
-            "sceneStatus": 1,
-            "sceneTypeList": None,
-            "__times": 0
-        }, timeout=10)
-
-        print(f"[HTTP] 状态码: {resp.status_code}")
-
-        if resp.status_code != 200:
-            print(f"[错误] 请求失败: {resp.text}")
-            return None
-
-        data = resp.json()
-
-        # 检查是否登录失效
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {xc.COOKIE_FILE} 后重新运行")
-            return None
-
-        if data.get("flag") != True:
-            print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
-            return None
-
-        scenes = data.get("data", [])
-        print(f"[OK] 查询成功，共找到 {len(scenes)} 个场景\n")
-
-        return scenes
-
-    except Exception as e:
-        print(f"[错误] 请求异常: {e}")
+    data = xc.post(session, API_SCENE_QUERY, {
+        "sceneType": 1,
+        "sceneStatus": 1,
+        "sceneTypeList": None,
+        "__times": 0,
+    })
+    if not data:
         return None
+    if data.get("flag") is not True:
+        print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
+        return None
+    scenes = data.get("data", [])
+    print(f"[OK] 查询成功，共找到 {len(scenes)} 个场景\n")
+    return scenes
 
 
 def query_app_detail(session: requests.Session, app_id: str, debug=False):
     """查询指定 appId 的详细信息"""
-    try:
-        resp = session.post(API_APP_QUERY, json={
-            "appId": app_id
-        }, timeout=10)
-
-        if resp.status_code != 200:
-            return None
-
-        data = resp.json()
-
-        # 调试模式：打印脱敏后的返回
-        if debug:
-            print(f"\n[调试] app/query 返回数据:")
-            print(json.dumps(mask_dict(data), ensure_ascii=False, indent=2))
-
-        if data.get("flag") == True:
-            # 数据在 data.records 数组里
-            records = data.get("data", {}).get("records", [])
-            return next(
-                (record for record in records if str(record.get("appId")) == str(app_id)),
-                None,
-            )
-        return None
-
-    except Exception as e:
-        print(f"[警告] 查询 {app_id} 失败: {e}")
-        return None
+    data = xc.post(session, API_APP_QUERY, {"appId": app_id}, debug=debug)
+    if data and data.get("flag") is True:
+        records = data.get("data", {}).get("records", [])
+        if records:
+            return records[0]
+    return None
 
 
 def display_scenes(scenes: list, session: requests.Session):
@@ -193,33 +153,15 @@ def query_all_apps(session: requests.Session):
     print("[查询] 所有应用列表...")
     print("="*60)
 
-    try:
-        resp = session.post(API_APP_QUERY, json={
-            "current": 1,
-            "size": 100
-        }, timeout=10)
-
-        if resp.status_code != 200:
-            print(f"[错误] 请求失败: {resp.text}")
-            return None
-
-        data = resp.json()
-
-        if data.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {xc.COOKIE_FILE} 后重新运行")
-            return None
-
-        if data.get("flag") != True:
-            print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
-            return None
-
-        apps = data.get("data", {}).get("records", [])
-        print(f"[OK] 查询成功，共找到 {len(apps)} 个应用\n")
-        return apps
-
-    except Exception as e:
-        print(f"[错误] 请求异常: {e}")
+    data = xc.post(session, API_APP_QUERY, {"current": 1, "size": 100})
+    if not data:
         return None
+    if data.get("flag") is not True:
+        print(f"[警告] 接口返回异常: {data.get('desc', '未知错误')}")
+        return None
+    apps = data.get("data", {}).get("records", [])
+    print(f"[OK] 查询成功，共找到 {len(apps)} 个应用\n")
+    return apps
 
 
 # 能力判断（authKey → 网页产品名）

@@ -318,9 +318,8 @@ def upload_file(session, lib_id, file_path, file_type="text"):
         if resp.status_code != 200:
             print(f"[错误] 上传 HTTP {resp.status_code}: {resp.text[:200]}")
             return None
-        j = resp.json()
-        if j.get("code") == 80000:
-            print(f"[警告] 登录已失效，请删除 {xc.COOKIE_FILE} 后重新运行")
+        j = xc.handle_json_response(resp.json())
+        if j is None:
             return None
         if not _ok(j):
             print(f"[失败] 上传返回: {_fail_desc(j)}")

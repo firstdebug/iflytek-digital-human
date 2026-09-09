@@ -16,7 +16,7 @@ Android 分支的检查项清单、检测脚本、配置 / 修复模板、编排
 | 5 | ABI 配置 | ⭐⭐⭐ | — | 仅支持 armeabi-v7a / arm64-v8a |
 | 6 | 依赖检查 | ⭐⭐⭐ | 是 | okhttp 3.11.0+（必需），gson 可选 |
 | 7 | 构建配置 | ⭐⭐ | — | jniLibs.srcDirs 含 'libs' 必需 |
-| 8 | Gradle 稳定性 | ⭐⭐⭐ | 是 | 单一调用、镜像、daemon/cache、保守 heap/workers、超时不重跑 |
+| 8 | gradle.properties 性能 | ⭐⭐⭐ | 是 | daemon/parallel/caching 必配（否则编译极慢） |
 | 9 | 签名配置 | ⭐⭐ | — | Release 版本必需 |
 
 检查优先级：Gradle / Android SDK / JDK = Critical；依赖 / 性能配置 = High；ABI = Medium（推荐）；签名 = Low（发布时必需）。
@@ -29,7 +29,7 @@ Android 分支的检查项清单、检测脚本、配置 / 修复模板、编排
 | 8 | 4.x–7.0 | 6.x–7.0 | 30- | 不推荐 |
 
 平台差异：Windows 使用 `gradlew.bat`，macOS/Linux 使用 `./gradlew`，注意路径分隔符。
-**编译规范（HARD-GATE）**：永远用 `gradlew`（复用 daemon），严禁 `--no-daemon`；同一工程同一时间只运行一个 Gradle 调用。完整状态机见 `../../avatar-shared/android-gradle-stability.md`。
+**编译规范（HARD-GATE）**：永远用 `gradlew`（复用 daemon），**严禁 `--no-daemon`**（会全量、极慢，实测 22 分钟）。
 
 ---
 
@@ -80,7 +80,7 @@ if (version >= 7.4) {
 ```bash
 # 升级 Gradle Wrapper
 # gradle/wrapper/gradle-wrapper.properties
-distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.0.2-bin.zip
+distributionUrl=https\://services.gradle.org/distributions/gradle-7.6-bin.zip
 ```
 
 ---
@@ -89,25 +89,23 @@ distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.0.2-bin.zip
 ```properties
 # gradle/wrapper/gradle-wrapper.properties
 
-# ✅ 腾讯云镜像（版本必须与工程矩阵一致）
-distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-8.0.2-bin.zip
+# ✅ 腾讯云镜像（推荐，速度快）
+distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-7.5-bin.zip
 
-# ✅ 阿里云镜像（备用，先验证目标文件存在）
-distributionUrl=https\://mirrors.aliyun.com/gradle/gradle-8.0.2-bin.zip
+# ✅ 阿里云镜像（备用）
+distributionUrl=https\://mirrors.aliyun.com/gradle/gradle-7.5-bin.zip
 
 # ❌ 官方源（国内慢，仅备用）
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.0.2-bin.zip
+distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip
 ```
 
 **Maven 依赖加速（build.gradle）**:
 ```gradle
 allprojects {
     repositories {
-        // 国内镜像优先，官方仓库兜底
+        // ✅ 阿里云镜像（推荐）
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-        maven { url 'https://repo.huaweicloud.com/repository/maven/' }
         
         // 官方源（备用）
         google()
@@ -452,25 +450,24 @@ android {
     }
     
     packagingOptions {
-        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
-        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_avatar-shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_avatar-shared.so'
     }
 }
 ```
 
 ---
 
-## 8. Gradle 稳定性检查（HARD-GATE）
+## 8. gradle.properties 性能配置检查（HARD-GATE：编译不卡的关键）
 
-**检查方法**：读取 `gradle.properties`、Wrapper 和仓库配置，并确认没有同工程的第二个 Gradle 调用。内存未知或单模块工程使用以下保守默认值。
+**检查方法**: 读取 `gradle.properties`，确认以下六项就位。
 
 **要求**:
 ```properties
-org.gradle.jvmargs=-Xmx1280m -Dfile.encoding=UTF-8
-org.gradle.daemon=true
-org.gradle.parallel=false
-org.gradle.workers.max=2
-org.gradle.caching=true
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+org.gradle.daemon=true          # 复用守护进程（缺失或 --no-daemon 会每次全量, 实测 22 分钟）
+org.gradle.parallel=true        # 并行模块构建
+org.gradle.caching=true         # 构建缓存, 增量秒级
 org.gradle.configureondemand=true
 android.useAndroidX=true
 ```
@@ -478,19 +475,16 @@ android.useAndroidX=true
 **判断**:
 ```javascript
 const gp = fs.existsSync('gradle.properties') ? fs.readFileSync('gradle.properties','utf-8') : '';
-const need = [
-  'org.gradle.daemon=true',
-  'org.gradle.parallel=false',
-  'org.gradle.workers.max=2',
-  'org.gradle.caching=true'
-];
+const need = ['org.gradle.daemon=true','org.gradle.parallel=true','org.gradle.caching=true'];
 const missing = need.filter(k => !gp.includes(k));
 if (missing.length) return { status: 'perf_config_missing', missing,
-  fix: '写入保守 Gradle 配置；编译用单一 gradlew 调用，严禁超时后并发重跑' };
+  fix: '写入 gradle.properties 六项性能配置；编译用 gradlew 且严禁 --no-daemon' };
 return { status: 'perf_config_ok' };
 ```
 
-实测长时间无进展通常不是 Java 编译本身，而是 Wrapper/依赖首次下载、官方仓库慢、命令超时后旧 Gradle 仍在后台、缓存锁争用，以及 heap/workers 超过可用内存。先在线预热，成功后用同一任务集合 `--offline` 复验。完整诊断和禁用项见 `../../avatar-shared/android-gradle-stability.md`。
+**血泪根因**：本平台实测首次 `assembleDebug` 耗时 **22 分钟**，根因是 `--no-daemon` + 无性能配置。
+配齐后首次约 3-5 分钟（含 AGP/依赖下载）、增量秒级。**镜像加速**：settings.gradle 加
+`maven { url 'https://maven.aliyun.com/repository/google' }` 与 `.../public` 加速首次依赖。
 
 ---
 
@@ -575,11 +569,8 @@ async function checkAndroidToolchain() {
   
   // 7. 构建配置
   results.checks.build_config = await checkBuildConfig();
-
-  // 8. Gradle 稳定性
-  results.checks.gradle_stability = await checkGradleStability();
   
-  // 9. 签名配置
+  // 8. 签名配置
   results.checks.signing = await checkSigning();
   
   // 汇总状态（summarizeStatus 通用骨架见 ../SKILL.md）
@@ -622,10 +613,6 @@ if (checks.dependencies.status === 'missing_dependencies') {
 // 构建配置问题
 if (checks.build_config.status === 'build_config_issues') {
   warnings.push('构建配置不完整');
-}
-
-if (checks.gradle_stability.status === 'perf_config_missing') {
-  warnings.push('Gradle 稳定性配置不完整');
 }
 
 // ABI 配置建议
@@ -703,7 +690,25 @@ checks:
 - Gradle 版本不兼容
 - 依赖下载失败
 
-**解决**：按 `../../avatar-shared/android-gradle-stability.md` 先区分 Wrapper 下载、Maven 解析、缓存锁和内存问题。不得先执行 `clean --refresh-dependencies`；确认没有活动构建后，使用单一在线命令预热，成功后再离线复验。
+**解决**:
+```bash
+# 1. 清理缓存
+./gradlew clean
+
+# 2. 使用国内镜像
+# build.gradle (project level)
+allprojects {
+    repositories {
+        maven { url 'https://maven.aliyun.com/repository/public/' }
+        maven { url 'https://maven.aliyun.com/repository/google/' }
+        google()
+        mavenCentral()
+    }
+}
+
+# 3. 重新同步
+./gradlew build --refresh-dependencies
+```
 
 ### 2. AAR 未被识别
 
@@ -742,8 +747,8 @@ android {
     }
     
     packagingOptions {
-        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
-        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_avatar-shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_avatar-shared.so'
     }
 }
 ```

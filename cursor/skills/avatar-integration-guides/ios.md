@@ -298,7 +298,7 @@ do {
 }
 
 // 获取控制器
-let controller = AvatarPlatform.shared()
+let controller = AvatarPlatform.avatar-shared()
 
 // 创建播放器
 let player = StreamPlayerFactory.createStreamPlayer(with: videoView)

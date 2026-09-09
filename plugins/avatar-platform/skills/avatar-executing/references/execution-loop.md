@@ -1,8 +1,6 @@
-# 严格模式执行循环 (Step 3)
+# 执行循环 (Step 3)
 
-本文件仅在 `workflow_mode=strict` 时读取。逐步执行实现计划中的每个步骤，选择合适的 writer/reviewer，应用变更并验证。
-
-`workflow_mode=quick` 时不要读取下方 writer/reviewer 细节。由主 agent 按平台 Playbook 直接实现，运行同样的真实 API 黑名单、静态扫描、测试、构建和运行验证；只有 `delivery-modes.md` 规定的客观升级信号出现时才调用一次针对性 reviewer。
+逐步执行实现计划中的每个步骤，选择合适的 writer/reviewer，应用变更并验证。
 
 ## Step 3.0: 前置检查 — SDK 下载（必需）
 
@@ -103,8 +101,9 @@ for (const step of plan.steps) {
 
 ```javascript
 function getAuthoritativeApiDocPath(platform) {
-  // Android/Web 首次接入：完整实现使用 playbook 和实际 SDK 产物。
-  // avatar-integration-guides/android.md 已校正，可用于快速理解，但不覆盖完整构建流程。
+  // ⚠️ Android/Web 首次接入：唯一权威 API 来源是 playbook，不是 avatar-integration-guides/*.md。
+  //   avatar-integration-guides/android.md 是【人工简化失真版】，含 createStreamPlayer/sendText/onNlpResult
+  //   等不存在的 API，照它写必崩。playbook §1 是 javap 反编译的真实全表 + 已真机验证。
   const authoritative = {
     'web':     'skills/avatar-executing/references/web-sdk-build-playbook.md',
     'android': 'skills/avatar-executing/references/android-sdk-build-playbook.md',
@@ -120,8 +119,8 @@ function getAuthoritativeApiDocPath(platform) {
   return docPath;
 }
 
-// 已废弃：getIntegrationGuidePath() 只返回快速指南，信息不足以支撑完整构建。
-// 任何派发 writer/reviewer 的地方都必须改用 getAuthoritativeApiDocPath()。
+// ❌ 已废弃：getIntegrationGuidePath()。它指向 avatar-integration-guides/android.md（失真文档），
+//    是历史踩坑根因。任何派发 writer/reviewer 的地方都必须改用 getAuthoritativeApiDocPath()。
 ```
 
 ### shouldUseAvatarWriter()
@@ -260,7 +259,7 @@ if (detectHandWrittenWebSocket(code)) {
 执行循环的关键改进：
 1. ✅ **Step 3.0 强制下载 SDK** — 在任何代码生成前
 2. ✅ **传递权威 API 文档** — `getAuthoritativeApiDocPath()` 给 writer 和 reviewer 传 **playbook**
-   （Android/Web）；快速指南只作辅助，也不用主 agent 手搓的 api-notes
+   （Android/Web），**绝不**传 avatar-integration-guides/*.md 失真文档，也不用主 agent 手搓的 api-notes
 3. ✅ **失真 API 黑名单校验** — `verifyRealSdkApiUsed()` 检测 createStreamPlayer/sendText/
    onNlpResult 等不存在的 API，命中即打回重写（HARD-GATE）
 4. ✅ **资产来自探测** — `verifyAssetsFromProbe()` 校验 avatarId/vcn 用的是 auth-avatar 探测值，

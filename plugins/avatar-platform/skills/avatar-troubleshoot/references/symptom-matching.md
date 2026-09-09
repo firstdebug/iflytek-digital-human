@@ -101,24 +101,3 @@ async function diagnoseNoVideo(info) {
   // ... 继续其他检查
 }
 ```
-# Android Gradle 长时间无进展
-
-```yaml
-症状:
-  - Wrapper 下载停留
-  - Gradle 首个 task 前长时间无输出
-  - Waiting to acquire lock
-  - 命令超时后再次执行仍卡住
-  - daemon disappeared 或频繁 GC
-常见根因:
-  - 官方 Wrapper/Maven 仓库在当前网络下过慢
-  - 冷缓存首次下载 AGP、AndroidX 或 Release Lint 依赖
-  - 上一次超时命令仍在后台运行并持有缓存锁
-  - parallel/workers/heap 超过可用内存
-诊断:
-  - 读取 ../../avatar-shared/android-gradle-stability.md
-  - 区分下载、锁、内存和真实编译阶段
-硬约束:
-  - 不并发重跑 Gradle
-  - 不把 clean、refresh-dependencies 或删除全局缓存作为首修
-```

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>虚拟人 Web SDK Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🤖 虚拟人 Web SDK Demo</h1>
+      <div id="status" class="status">未初始化</div>
+    </header>
+
+    <main>
+      <!-- 虚拟人渲染区域 -->
+      <section class="avatar-section">
+        <div id="avatar-container" class="avatar-container"></div>
+        <div id="resume-hint" class="resume-hint" style="display: none;">
+          <p>⚠️ 浏览器阻止了自动播放</p>
+          <button id="resume-btn" class="btn btn-primary">点击恢复播放</button>
+        </div>
+        <button id="init-btn" class="btn btn-primary btn-large">🚀 初始化虚拟人</button>
+      </section>
+
+      <!-- 功能控制区 -->
+      <section class="controls-section">
+        <!-- 文字对话 -->
+        <div class="control-group">
+          <h3>💬 文字对话</h3>
+          <div class="input-group">
+            <input
+              type="text"
+              id="text-input"
+              placeholder="输入文字与虚拟人对话..."
+              disabled
+            />
+            <button id="send-btn" class="btn btn-primary" disabled>发送</button>
+          </div>
+        </div>
+
+        <!-- 语音交互 -->
+        <div class="control-group">
+          <h3>🎤 语音交互（点击开始/停止）</h3>
+          <button id="voice-btn" class="btn btn-secondary" disabled>🎤 开始语音</button>
+        </div>
+
+        <!-- 动作控制 -->
+        <div class="control-group">
+          <h3>🎭 动作控制</h3>
+          <div class="action-buttons">
+            <button class="btn action-btn" data-action="nod" disabled>点头</button>
+            <button class="btn action-btn" data-action="wave" disabled>挥手</button>
+            <button class="btn action-btn" data-action="think" disabled>思考</button>
+            <button class="btn action-btn" data-action="smile" disabled>微笑</button>
+          </div>
+        </div>
+
+        <!-- 对话记录 -->
+        <div class="control-group">
+          <h3>📝 对话记录</h3>
+          <div id="messages" class="messages"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>✨ 功能：文字对话 + 语音交互 + 动作控制 + 透明背景（XRTC）</p>
+      <p>🔐 安全：服务端签名，apiSecret 不暴露给前端</p>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

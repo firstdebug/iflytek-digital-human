@@ -2,17 +2,17 @@
 
 > **适用**：用户要求"用 SDK 自建 Android 虚拟人工程"（原生 App，非 Web 模板、非直播）。
 > **原则**：本文件是 Android SDK 自建工程的**唯一权威落地流程**。按此流程生成的代码必须**一次编译成功、一次真机跑通**，
-> 不允许先猜 API 再靠报错逐个修补。`avatar-integration-guides/android.md` 已按同一版真实 API 校正，可用于快速理解；完整工程仍以本 playbook 为准。
+> 不允许"先生成、再靠报错逐个打补丁"，更不允许照 `avatar-integration-guides/android.md` 的简化 API 写代码。
 > 所有 API 签名来自 **`avatar-core-v3.2.7.aar` 真实反编译（javap）**，已在真机 `10AF9T1AG3002EK` 验证跑通。
 
 ---
 
 ## 0. 为什么需要这个 Playbook（血泪根因）
 
-早期简化版 Android 指南曾包含与 SDK 不一致的 API，当前 `avatar-integration-guides/android.md` 已完成校正。
-保留下表作为历史回归清单，防止旧写法重新进入生成代码；实现时以当前 playbook 和实际 AAR 为准：
+`avatar-integration-guides/android.md` 是**人工简化版文档，与真实 SDK API 不符**。照它写的代码会编译失败或运行崩溃，
+且反编译 AAR 才能拿到真 API 耗费大量轮次。下面是"文档写的 vs 真实的"对照（**一律以本表真实列为准**）：
 
-| 环节 | 历史错误写法 | 真实 API（avatar-core-v3.2.7 反编译） |
+| 环节 | ❌ 简化文档写的（不存在/错误） | ✅ 真实 API（avatar-core-v3.2.7 反编译） |
 |------|------------------------------|----------------------------------------|
 | 包名 | 裸类名，未给 import | 统一 `com.iflytek.avalibrary.*` |
 | 初始化 | `AvatarPlatform.initialize(ctx, config)` 返回 AvatarError | `AvatarPlatform.initialize(Context, config, IInitListener)` **3参**，结果走 `IInitListener.onResult(code,msg)`，成功 **code="0"** |
@@ -25,7 +25,7 @@
 | 响应文本 | 假设在 data 字节 | **在 `extra` 参数的 JSON（`answer.text`）**，data 常为空 |
 | 字幕 | 假设有 subtitle 回调 | **无独立回调**，用 onResult 的 nlp/asr 文本渲染 |
 
-**一句话规则**：客户端 API 只使用本 playbook §1 和实际 SDK 产物确认过的签名，不猜测、不臆造。
+**一句话铁律**：客户端 API **只认本 playbook §1**，不认 avatar-integration-guides/android.md、不猜、不臆造。
 若怀疑 AAR 版本不同导致签名变化，用 `javap -public -classpath classes.jar com.iflytek.avalibrary.X` 核对，不要猜。
 
 ---
@@ -132,7 +132,7 @@ controller.destroy();
 - 解压后放入 `app/libs/`：`avatar-core-v3.2.7.aar` + `xrtcsdk-5.2024.3.0_00_hotfix1.aar`
 - 验证：`ls app/libs/*.aar` 两个都在。
 
-**Step 2 — 建工程骨架**（gradle-8.x + AGP 8.1.4，见 §3 版本矩阵与 `../../avatar-shared/android-gradle-stability.md`）
+**Step 2 — 建工程骨架**（gradle-8.x + AGP 8.1.4，见 §3 版本矩阵）
 - 用现成 gradle 生成 wrapper：`gradle wrapper --gradle-version 8.0.2 --distribution-type bin`
 - 目录：settings.gradle / build.gradle / gradle.properties / app/build.gradle / app/src/main/{AndroidManifest.xml,java/...,res/layout,assets}
 - 验证：`gradlew --version` 显示 Gradle 8.x / JVM 17。
@@ -149,7 +149,7 @@ controller.destroy();
 - 从 assets 读 credentials → initialize → getController → setGlobalParams → setStreamPlayer → addAvatarListener → start
 
 **Step 6 — 四功能 + 编译真机**（按 §1.5）
-- `gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain`（用 daemon，不加 `--no-daemon`；只启动这一个 Gradle 调用）
+- `gradlew :app:assembleDebug`（**用 daemon，不加 --no-daemon**）
 - `adb -s <设备> install -r app/build/outputs/apk/debug/app-debug.apk`
 - 验证知识库命中：发健身问题 → logcat 看 `onResult type=nlp ... "service":"docqa" ... "sourceDetail":"xxx.md"`
 
@@ -167,30 +167,25 @@ controller.destroy();
 | minSdk | 26（SDK 支持下限之上） |
 > JDK 11 场景才用 AGP 7.x/Gradle 7.x。**JDK17 配 Gradle7.x 会同步失败**。
 
-### 3.2 `gradle.properties`（单模块/内存未知机器的保守默认值）
+### 3.2 `gradle.properties`（必须写入，解决 22 分钟→首次3-5分钟/增量秒级）
 ```properties
-org.gradle.jvmargs=-Xmx1280m -Dfile.encoding=UTF-8
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 org.gradle.daemon=true
-org.gradle.parallel=false
-org.gradle.workers.max=2
+org.gradle.parallel=true
 org.gradle.caching=true
 org.gradle.configureondemand=true
 android.useAndroidX=true
 ```
 
 ### 3.3 编译规范（HARD-GATE）
-- 永远用 `gradlew`（复用 daemon），严禁 `--no-daemon`。
-- 同一工程同一时间只运行一个 Gradle 调用；工具等待超时后续接原会话，不得立即重跑。
+- **永远用 `gradlew`（复用 daemon），严禁 `--no-daemon`**——本次 22 分钟慢就是关了 daemon + 首次下载。
 - settings.gradle 的 `dependencyResolutionManagement.repositories` 加国内镜像加速首次依赖：
   ```gradle
   maven { url 'https://maven.aliyun.com/repository/google' }
   maven { url 'https://maven.aliyun.com/repository/public' }
-  maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-  maven { url 'https://repo.huaweicloud.com/repository/maven/' }
   google(); mavenCentral()
   ```
-- 冷缓存先在线合并执行测试与 Debug 构建，成功后用相同任务加 `--offline` 做交付复验。Release 的 Lint 依赖可能未被 Debug 预热，需要时在 Debug 完成后单独在线构建。
-- 长任务保持为同一个可轮询进程；不要因为工具等待超时再启动第二个 Gradle。详细状态机和卡住诊断见 `../../avatar-shared/android-gradle-stability.md`。
+- 首次编译会下载 AGP+AndroidX（约 3-5 分钟属正常），之后增量秒级。用 `run_in_background` 跑编译，别干等。
 
 ---
 
@@ -207,9 +202,8 @@ android.useAndroidX=true
 ## 5. 一次跑通验证清单
 
 - [ ] 两个 AAR 在 app/libs/
-- [ ] gradle.properties 保守稳定配置就位，且没有重叠 Gradle 调用
-- [ ] 在线 `gradlew :app:testDebugUnitTest :app:assembleDebug --console=plain` → BUILD SUCCESSFUL
-- [ ] 热缓存下同一任务集合加 `--offline` → BUILD SUCCESSFUL
+- [ ] gradle.properties 六项性能配置就位
+- [ ] `gradlew :app:assembleDebug` → BUILD SUCCESSFUL（无 duplicate .so 报错）
 - [ ] `adb install -r` → Success
 - [ ] 启动无崩溃，logcat `onEvent type=frame_start`（虚拟人开始播报）
 - [ ] 虚拟人形象**渲染到屏幕**（截图确认，非黑屏——靠 setRenderArea）
@@ -226,22 +220,13 @@ android.useAndroidX=true
 ### 6.1 settings.gradle
 ```gradle
 pluginManagement {
-    repositories {
-        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-        maven { url 'https://repo.huaweicloud.com/repository/maven/' }
-        google(); mavenCentral(); gradlePluginPortal()
-    }
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         maven { url 'https://maven.aliyun.com/repository/google' }
         maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-        maven { url 'https://repo.huaweicloud.com/repository/maven/' }
         google(); mavenCentral()
         flatDir { dirs 'app/libs' }
     }
@@ -329,7 +314,7 @@ dependencies {
 
 ### 6.7 gradle.properties / local.properties
 ```properties
-# gradle.properties — 见 §3.2 保守稳定配置
+# gradle.properties — 见 §3.2 六项
 # local.properties — sdk.dir=C\:\\Android\\Sdk （指向本机 Android SDK）
 ```
 

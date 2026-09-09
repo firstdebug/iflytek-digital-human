@@ -22,7 +22,7 @@ function detectSDK(platform) {
 }
 ```
 
-## 在 Codex 中调用（自动执行下载）
+## 在 Claude 中调用（自动执行下载）
 
 ```javascript
 // 在 avatar-preflight Layer 3 检测到 SDK 缺失时

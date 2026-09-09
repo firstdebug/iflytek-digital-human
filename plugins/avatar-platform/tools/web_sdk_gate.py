@@ -14,6 +14,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+import websocket_auth
+
 
 ENV_ALIASES = {
     "app_id": ("APP_ID", "XF_APP_ID"),
@@ -35,6 +37,8 @@ MIN_LENGTH = {
 }
 HALLUCINATED_APIS = ("setServerUrl", "getPlayer")
 REQUIRED_SDK_METHODS = ("setApiInfo", "setGlobalParams", "start", "writeText")
+AUTH_FAILURE_CODES = (1008, 10110, 10113, 10114, 10120, 10121, 11203)
+AUTH_FAILURE_TEXT = ("avatar authentication failed", "authorization invalid")
 
 
 def _sha256(path):
@@ -68,6 +72,33 @@ def _read_json(path):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _has_authentication_failure(evidence):
+    """Recognize auth rejection in the current browser evidence only."""
+    candidates = [evidence.get("errors"), evidence.get("close_code"),
+                  evidence.get("close_reason"), evidence.get("error_code")]
+    text = json.dumps(candidates, ensure_ascii=False, default=str).lower()
+    if any(marker in text for marker in AUTH_FAILURE_TEXT):
+        return True
+    return any(re.search(r"(?<!\d){}(?!\d)".format(code), text)
+               for code in AUTH_FAILURE_CODES)
+
+
+def _logical_env(values, logical_name):
+    for alias in ENV_ALIASES[logical_name]:
+        if values.get(alias):
+            return values[alias]
+    return None
+
+
+def _credential_fingerprint(values):
+    fields = (_logical_env(values, "app_id"), _logical_env(values, "api_key"),
+              _logical_env(values, "api_secret"), _logical_env(values, "scene_id"),
+              _logical_env(values, "ws_url"))
+    if not all(fields):
+        return None
+    return hashlib.sha256("\0".join(fields).encode("utf-8")).hexdigest()
 
 
 def _read_env(project):
@@ -163,12 +194,7 @@ def _server_issues(project, node_check):
     server = project / "server.js"
     if not server.is_file():
         return ["server_js_missing"]
-    text = server.read_text(encoding="utf-8", errors="ignore")
-    issues = []
-    if not re.search(r"GET\s+\$\{path\}\s+HTTP/1\.1", text):
-        issues.append("signature_request_line_missing")
-    if not re.search(r"headers=[\\\"']host date request-line[\\\"']", text):
-        issues.append("signature_headers_mismatch")
+    issues = websocket_auth.server_usage_issues(project)
     ok, reason = node_check(server)
     if not ok:
         issues.append("server_syntax_failed" + ((":" + reason) if reason else ""))
@@ -252,8 +278,19 @@ def _runtime_issues(project, required_interaction, latest_static_mtime):
     if not evidence:
         return ["connected", "stream_start", "first_frame", required_interaction]
     issues = []
-    if evidence.get("source") not in ("playwright", "browser"):
+    # Authentication rejection takes precedence over later-looking success flags.
+    if _has_authentication_failure(evidence):
+        issues.append("authentication_failed")
+    state = _read_json(project / ".runtime" / "web-delivery.json") or {}
+    if evidence.get("source") != "playwright":
         issues.append("runtime_evidence_source")
+    if state.get("prepared_at_epoch") and evidence.get("prepared_at_epoch") != state.get("prepared_at_epoch"):
+        issues.append("runtime_evidence_prepared_at_mismatch")
+    if state.get("url") and evidence.get("url") != state.get("url"):
+        issues.append("runtime_evidence_url_mismatch")
+    expected_fingerprint = state.get("credential_fingerprint")
+    if expected_fingerprint and evidence.get("credential_fingerprint") != expected_fingerprint:
+        issues.append("runtime_evidence_credential_mismatch")
     try:
         if evidence_path.stat().st_mtime < latest_static_mtime:
             issues.append("runtime_evidence_stale")
@@ -265,9 +302,30 @@ def _runtime_issues(project, required_interaction, latest_static_mtime):
     if (evidence.get("target_interaction") != required_interaction
             or evidence.get("target_interaction_passed") is not True):
         issues.append(required_interaction)
-    if evidence.get("errors"):
+    errors = evidence.get("errors") or []
+    if not isinstance(errors, list):
+        errors = [errors]
+    core_succeeded = (
+        evidence.get("connected") is True
+        and evidence.get("stream_start") is True
+        and evidence.get("first_frame") is True
+        and evidence.get("target_interaction") == required_interaction
+        and evidence.get("target_interaction_passed") is True
+    )
+    blocking_errors = [
+        error for error in errors
+        if not (core_succeeded and _is_generic_resource_404(error))
+    ]
+    if blocking_errors:
         issues.append("runtime_errors")
     return issues
+
+
+def _is_generic_resource_404(error):
+    if not isinstance(error, str):
+        return False
+    value = error.lower()
+    return "failed to load resource" in value and "404" in value
 
 
 def run_checks(project, required_interaction="text", node_check=None,

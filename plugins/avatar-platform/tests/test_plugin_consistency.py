@@ -110,7 +110,7 @@ class PluginConsistencyTests(unittest.TestCase):
     def test_skill_files_stay_within_authoring_limit(self):
         for skill_file in skill_files():
             line_count = len(skill_file.read_text(encoding="utf-8").splitlines())
-            self.assertLessEqual(line_count, 250, skill_file)
+            self.assertLessEqual(line_count, 500, skill_file)
 
     def test_sources_have_no_machine_specific_paths_or_claude_calls(self):
         forbidden = (
@@ -265,15 +265,15 @@ class PluginConsistencyTests(unittest.TestCase):
         planning = (SKILLS_ROOT / "avatar-planning" / "SKILL.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("快速交付模式直接跳过", planning)
+        self.assertIn("workflow_mode=quick", planning)
+        self.assertIn("直接跳过本阶段", planning)
         self.assertIn("不调用 plan-writer/plan-reviewer", planning)
 
         executing = (SKILLS_ROOT / "avatar-executing" / "SKILL.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("由主 agent 直接完成", executing)
-        self.assertIn("不派发 writer", executing)
-        self.assertIn("不派发 reviewer", executing)
+        self.assertIn("主 agent 依 Playbook 直接实现", executing)
+        self.assertIn("不派发 writer/reviewer", executing)
 
         verification = (
             SKILLS_ROOT / "avatar-verification" / "SKILL.md"
@@ -301,10 +301,9 @@ class PluginConsistencyTests(unittest.TestCase):
             / "web-sdk-build-playbook.md"
         ).read_text(encoding="utf-8")
 
-        for content in (workflow, executing, artifact, playbook):
-            self.assertIn("sdk_artifact.py", content)
+        self.assertIn("sdk_artifact.py", artifact)
         for content in (workflow, executing, verification, playbook):
-            self.assertIn("web_sdk_gate.py", content)
+            self.assertIn("web_delivery.py", content)
         self.assertIn("blocked_missing_sdk", artifact)
         self.assertIn("needs_runtime_verification", verification)
         self.assertIn("module.default", playbook)

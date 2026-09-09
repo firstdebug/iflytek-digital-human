@@ -1,28 +1,5 @@
 # 完整验证流程
 
-## 平台分派
-
-下方 `verifyProject()` 是 Web 实现。Android 项目不得套用 `.env`、`node_modules` 或开发服务器检查，改用以下 Layer 映射，并先读 `../../avatar-shared/android-gradle-stability.md`：
-
-| Layer | Android 检查 |
-|---|---|
-| 1 文件完整性 | Wrapper、Gradle 文件、Manifest、Activity、资源和测试存在 |
-| 2 凭据 | 仅验证字段存在和构建类型隔离，不输出密钥；确认 sceneId 已发布 |
-| 3 SDK | `avatar-core-*.aar` 和 `xrtcsdk-*.aar` 存在且可被 Gradle 解析 |
-| 4 依赖 | Maven 镜像顺序正确；AAR/AndroidX/okhttp/gson 已解析 |
-| 5 配置 | ABI、jniLibs、真实 SDK API、bitrate、事件、权限与需求范围一致 |
-| 6 编译 | 单一在线 Gradle 调用预热成功，再用相同任务 `--offline` 复验 |
-| 7 运行时 | ADB 安装、Activity 启动、权限、初始化、首帧、交互、TTS/字幕和释放 |
-
-Layer 6 使用一个合并命令，不并发运行测试、Debug 和 Release：
-
-```powershell
-.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --console=plain --stacktrace
-.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --offline --console=plain
-```
-
-两个命令必须串行。第一个等待超时时续接原工具会话，不能启动第二个命令。需要 Release 时，等 Debug 全部完成后单独在线预热和离线复验。没有连接兼容设备时，Layer 7 标记 `pending_device_verification` 且 `ready_to_deliver: false`，不得声称真机链路已通过。
-
 ```javascript
 async function verifyProject() {
   console.log('🔍 开始项目验证...');
@@ -62,12 +39,13 @@ async function verifyProject() {
   if (fs.existsSync('.env')) {
     const envContent = fs.readFileSync('.env', 'utf-8');
     const requiredVars = [
-      'VITE_AVATAR_APP_ID',
-      'VITE_AVATAR_API_KEY',
-      'VITE_AVATAR_API_SECRET',
-      'VITE_AVATAR_SCENE_ID',
-      'VITE_AVATAR_AVATAR_ID',
-      'VITE_AVATAR_VCN'
+      'APP_ID',
+      'API_KEY',
+      'API_SECRET',
+      'SCENE_ID',
+      'AVATAR_ID',
+      'VCN',
+      'WS_URL'
     ];
     
     for (const varName of requiredVars) {

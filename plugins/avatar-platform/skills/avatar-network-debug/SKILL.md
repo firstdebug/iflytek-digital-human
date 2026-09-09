@@ -1,6 +1,6 @@
 ---
 name: avatar-network-debug
-description: 诊断讯飞虚拟人的 WebSocket、域名、TLS、代理、超时和断线问题。用于出现 10200、10201、连接失败、频繁断开或网络环境差异时。
+description: 虚拟人网络连接问题诊断
 ---
 
 # avatar-network-debug: 网络诊断

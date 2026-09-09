@@ -1,6 +1,6 @@
 ---
 name: avatar-full-duplex
-description: 实现讯飞虚拟人的全双工语音交互、实时识别、VAD 和播报打断。用于用户需要边说边听、低延迟对话或在播报中随时打断时。
+description: 全双工语音交互和打断功能
 ---
 
 # avatar-full-duplex: 全双工与打断

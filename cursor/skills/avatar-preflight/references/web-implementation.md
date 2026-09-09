@@ -18,7 +18,7 @@
 find . -name "index.js" -path "*/avatar-sdk-web*"
 
 # 2. 未找到时询问用户
-交互提问:
+平台交互提问:
   - 选项1: 指定已下载的 SDK 路径
   - 选项2: 自动下载到 ./sdk/avatar-sdk-web_3.2.3.1002/
   - 选项3: 稍后手动配置（跳过）

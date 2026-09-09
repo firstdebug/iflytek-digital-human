@@ -1,6 +1,6 @@
 ---
 name: avatar-subtitle-setup
-description: 配置讯飞虚拟人的字幕来源、同步、样式和显示。用于实现播报字幕、NLP 回复字幕，或处理透明背景场景中的客户端字幕时。
+description: 虚拟人字幕配置和显示
 ---
 
 # avatar-subtitle-setup: 字幕配置

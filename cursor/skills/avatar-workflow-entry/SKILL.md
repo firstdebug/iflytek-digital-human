@@ -1,90 +1,346 @@
 ---
 name: avatar-workflow-entry
 description: >-
-  讯飞虚拟人、数字人和 xfyun avatar 任务的统一入口。识别构建、SDK、模板、直播、WebAPI、知识库、模型、驱动、配置、排障或验证意图，并为 SDK 自建提供快速少文档或严格三阶段两种交付模式。
+  【讯飞虚拟人/数字人任务的必经入口 — 任何虚拟人相关请求都必须先调用本 skill 再响应】处理一切与讯飞虚拟人/数字人（xfyun
+  avatar）有关的需求：构建/搭建/做一个虚拟人项目或应用、从零创建/接入虚拟人、把虚拟人集成到
+  web/android/ios、Web对话模板、数字人直播、WebAPI报文接入、语音/文本/音频驱动、配置调整、故障排查，以及"你能做什么/有哪些功能"这类能力询问。本
+  skill 负责意图识别与智能路由，分发到对应子技能。触发词：构建虚拟人、搭建虚拟人、虚拟人项目、创建虚拟人、数字人、虚拟人集成、avatar、avatar
+  SDK、讯飞虚拟人、xfyun、virtual-man、数字人直播、虚拟主播、你能做什么、有哪些功能、功能清单。收到上述任一信号时不要用通用知识直接回答或抛技术选型问题（如
+  Unity/Three.js/2D-3D），必须先走本入口路由。
 ---
 
-# Avatar workflow entry
+# avatar-workflow-entry: 智能路由入口
 
-## 目标
+## ⚙️ 技能库位置（路由前必读）
 
-选择最具体的 `avatar-*` Skill 并继续执行。只询问会改变交付路径的信息，不重复收集用户已经提供的事实。
+本入口是 avatar-platform 技能包的总入口。整个技能库在固定位置：
 
-以本文件位置反推 `<plugin-root>`，从插件根目录解析 Skill、`tools/` 和 `config/`；不要依赖固定盘符、用户名或缓存版本。
+**根目录：`<plugin-root>`**（当前已加载的 `avatar-platform@skills-dir` 插件目录，Cursor 自动解析为真实路径）
+- 业务 skill：`skills/<name>/SKILL.md`（全部大写 SKILL.md）
+- 跨领域方法论：`skills/avatar-shared/` 下 2 个（测试驱动开发、并行分发子 agent），执行时应用，不在路由表内
+- 平台脚本：`tools/xfyun_*.py`｜工具注册表：`config/tools.yaml`｜平台能力矩阵：`config/platform-registry.yaml`
 
-## 路由流程
+**唯一来源门禁**：只读取当前 `<plugin-root>` 下的文件。禁止扫描或读取
+旧安装缓存、备份副本或工作目录中的同名副本。
+这些路径不是当前插件，不得作为 Skill、Playbook、端点、命令或上报规则的来源。
+当前插件内的全部业务 Skill 保留并按本入口路由；不要因为只允许终局上报就删除本插件内的支持 Skill。
 
-1. 判断咨询、创建、修改、排障或验证意图。
-2. 仅在已有工程相关时扫描平台、SDK 和当前改动。
-3. 按路由表选择最具体的 Skill。
-4. SDK 首次自建或多能力扩展时，按 `../avatar-shared/delivery-modes.md` 选择一次 `workflow_mode: quick | strict`；用户未选择前停止，不默认 quick。
-5. 把项目路径、平台、功能边界、资源状态、交付模式和已完成步骤传给目标 Skill，继续执行而不是只输出路由结果。
+**注册事实**：当前 `avatar-platform@skills-dir` 的业务 Skill 都由 Cursor 注册为可发现组件，实际清单以当前目录中的 `skills/*/SKILL.md` 为准。
+优先通过 Skill 调用目标；需要读取详细 Playbook 时，只读取
+`<plugin-root>/skills/<目标名>/SKILL.md`（文件名大小写固定），不得搜索其他安装或缓存目录。
 
-快速模式只需一句话说明路由和交付模式，之后仅在关键里程碑或阻塞时更新；严格模式可保留分阶段审计状态。
+## 定位
 
-## 快速路由
+虚拟人集成任务的**统一入口**，负责快速识别任务类型并路由到对应技能。
 
-| 用户意图 | 目标 Skill |
-|---|---|
-| 报错、黑屏、无声音、错误码、日志异常 | `avatar-troubleshoot` |
-| Android Gradle、Wrapper、下载、缓存锁或构建卡住 | `avatar-troubleshoot` + `avatar-shared/android-gradle-stability.md` |
-| 麦克风、相机或运行时权限 | `avatar-permissions-setup` |
-| WebSocket、超时、断线、10200/10201 | `avatar-network-debug` |
-| 修改分辨率、码率、形象、发音人、TTS 或背景 | `avatar-config-authoring` |
-| 凭据、appId、apiKey、apiSecret、sceneId | `avatar-credentials` |
-| 官方模板、H5、客服页、大屏、快速生成链接 | `avatar-web-template` |
-| 虚拟主播、商品、分镜、直播间 | `avatar-live-streaming` |
-| 不用 SDK、WebAPI、报文、直连 WebSocket | `avatar-webapi-protocol` |
-| 知识库、docqa、RAG、上传文档 | `avatar-knowledge-base` |
-| 创建、绑定、切换或发布大模型/NLP | `avatar-model-config` |
-| 首次 SDK 接入、从零构建、多能力或架构扩展 | `avatar-brainstorming`，携带 `workflow_mode` |
-| 已有项目增加单一能力 | 对应 driver/interact/action/subtitle/transparent Skill，默认 `quick` |
-| 快速理解 SDK 结构 | `avatar-integration-guides` |
-| 项目完成，需要交付验证 | `avatar-verification` |
+## 调用时机
 
-故障类信号优先于创建/配置类信号。完整优先级见 `references/routing-rules.md`。
+- 用户提出虚拟人相关需求
+- 明确的问题场景（故障排查、配置调整）
+- 模糊的需求场景（需要澄清）
 
-## SDK 自建模式
+---
+
+## 首次调用：能力清单 + 完整声明（隐私授权门禁，HARD-GATE）
+
+Cursor 没有 Claude Code 的 `UserPromptSubmit` Hook，因此由本入口在首次显式调用时执行门禁，且必须早于工程扫描、quick/strict 询问、意图识别和下游 Skill：
+
+1. 运行 `python "<plugin-root>/tools/telemetry.py" consent --status`。`accepted` 直接路由；`declined` 保持统计关闭并继续路由。
+2. `undecided` 或 `stale` 时，先完整读取并原样展示 `<plugin-root>/docs/capabilities.md`，再运行 `python "<plugin-root>/tools/telemetry.py" notice` 并原样展示完整声明。完整能力清单和授权声明必须出现在助手对话正文中；工具 stdout、隐藏上下文、脚本日志或仅给文件路径都不算展示。
+3. 只询问“同意使用统计”或“不同意使用统计”。用户明确选择前停止，不能扫描、实施或把沉默当成同意。
+
+选择同意后运行 `telemetry.py consent --accept`，然后重新读取本入口再继续原请求；选择不同意运行 `telemetry.py consent --decline`，不重读入口、不上传但继续原请求。授权只控制统计，不是使用虚拟人功能的前提。
+
+同意后事件先写本地 JSON；只有登录业务成功取得有效 Cookie 后，`xfyun_common.py` 才异步触发上传。Cookie、SSO token 和密钥永不进入报文。没有平台 Hook 的环境不要声称自动记录每轮对话；需要记录时显式调用 `telemetry.py`。
+
+### 显式统计生命周期（仅授权状态为 accepted 时）
+
+授权门禁结束后、业务扫描前，只运行一次：
+
+```bash
+python "<plugin-root>/tools/telemetry.py" start --project "<项目目录>"
+```
+
+保存命令返回的 `workflowId`，本任务后续所有统计命令都显式传入它，不能依赖全局会话猜测。每次准备使用一个下游 Skill 时，在读取其资料或实施前记录一次；重复记录会按 `workflowId + skill` 自动去重：
+
+```bash
+python "<plugin-root>/tools/telemetry.py" invoke --workflow "<workflowId>" --skill "avatar-executing" --type sdk_integration
+```
+
+`--type` 使用路由确定的工作流类型；入口尚未确定类型时可先省略，在第一个能确定类型的下游 Skill 上补齐。真实交付完成后用同一个 `workflowId` 收口：
+
+```bash
+python "<plugin-root>/tools/telemetry.py" complete --workflow "<workflowId>" --type sdk_integration --project "<项目目录>"
+python "<plugin-root>/tools/telemetry.py" fail --workflow "<workflowId>" --reason "<非敏感失败原因>"
+```
+
+Web SDK 必须由 `web_delivery.py` 的最终门禁调用完成上报，不得绕过运行证据直接执行 `complete`。宿主进程被强制终止时没有 `Stop/SessionEnd` 事件，记录会保持 `in_progress`；不得伪造完成状态。
+
+---
+
+## 核心工作流概览
+
+三步完成路由决策：
+
+1. **快速扫描工程** — 检测 SDK 集成状态（未集成 / 部分 / 完整）与平台（web / android / ios / unknown）
+2. **意图识别** — 结合关键词、指标、工程扫描结果输出意图类型与置信度
+3. **路由决策** — 按置信度阈值决定直接路由、询问确认或回退完整流程
+
+完整代码实现见 `references/routing-flow.md`。
+
+---
+
+## 用户确认门禁（HARD-GATE：必须先问，不能默认）
+
+这两个门禁在路由阶段就要判定，**不得**因为需求看起来明确而跳过。
+
+### 1. 交付模式门禁（workflow_mode）
+
+首次 SDK 自建、从零构建或多能力扩展，**必须**先用 `平台交互提问` 让用户选择
+`workflow_mode: quick | strict`，规则见 `../avatar-shared/delivery-modes.md`。
+
+- 用户未选择时**停止实施**，不能默认 `quick`，也不能把"推荐 quick"当作用户已选择。
+- 用户明确说"快速做、先跑起来、少文档、不要 reviewer"→ `quick`，不重复询问。
+- 用户明确说"完整设计、严格流程、要审计"→ `strict`，不重复询问。
+- 已有项目的单一配置修改或故障修复默认 `quick`，无需提问。
+- 把选择结果连同项目路径、平台、功能边界一起传给下游 skill。
 
 | 模式 | 流程 | 默认产物 |
-|---|---|---|
-| `quick`（推荐） | `avatar-brainstorming` 形成内存实施摘要 → `avatar-executing` 主 agent 直接实现 | 工程、构建/运行结果；不生成过程文档 |
-| `strict` | `avatar-brainstorming` → `avatar-planning` → `avatar-executing`，含 spec/plan/code 评审 | 工程、设计、计划和完整验证报告 |
+|------|------|----------|
+| `quick`（推荐） | `avatar-brainstorming` 形成内存实施摘要 → `avatar-executing` 主 agent 直接实现 | 工程 + 构建/运行结果，不生成过程文档 |
+| `strict` | `avatar-brainstorming` → `avatar-planning` → `avatar-executing`，含 spec/plan/code 评审 | 工程 + 设计 + 计划 + 完整验证报告 |
 
-用户明确说快速、直接做、少文档或不要 reviewer 时直接选 `quick`。用户明确要求完整文档、审计或多人交接时选 `strict`。首次自建未表态时必须只问一次并推荐 `quick`，但不得在用户未回答时继续实现。
+### 2. 语音能力门禁
 
-## 用户确认门禁
+新增语音识别、语音问答、录音、麦克风权限或语音 UI 前，**必须**单独用 `平台交互提问`
+征得用户确认，并同时确认交互形态：**按住说话 / 点击开始停止 / 自动 VAD / 全双工**。
 
-- **交付模式门禁**：首次 SDK 自建、从零构建或多能力扩展必须先问 `quick` 还是 `strict`。不能把“推荐 quick”当成用户选择。
-- **语音门禁**：新增语音识别、语音问答、录音、麦克风权限或相关 UI 前，必须问用户是否确认加入语音能力，并确认交互形态。用户确认前不得修改 Manifest/Info.plist、申请麦克风权限或加入录音代码。
-- **边界记录**：把用户选择写入实施摘要的 `features` 和 `excluded`；未确认的能力必须进入 `excluded`。
+- 用户确认前**不得**修改 AndroidManifest.xml 或 Info.plist、**不得**加入 `RECORD_AUDIO`、
+  **不得**加入录音代码或语音 UI。
+- 用户只要求文本对话时，**不得**自行添加语音功能。
+- "给现有项目加语音"即使工程和目标明确，也要先问一次形态再实施。
+- 未确认的能力必须写入实施摘要的 `excluded`。
 
-## SDK 自建不可跳过项
+“文本对话”“语音交互”“麦克风/录音权限”“全双工”必须拆成独立可回答的问题；不能用“启用语音”隐含授权麦克风、录音或全双工。目标平台也必须显式确认 Web、Android、iOS（可多选），不能由“SDK 自建”代替平台答案。
 
-两种模式均执行：
+这两个门禁在 `avatar-executing`、`avatar-voice-interact` 和 `avatar-permissions-setup` 中同样强制执行，
+防止绕过本入口直接实施。
 
-1. 确认平台、功能范围、协议/背景和资源复用策略；未明确的能力不得自行扩展。
-2. 使用 `avatar-credentials` 验证 appId/sceneId 的归属、接口能力和发布状态。
-3. sceneId 无效、未发布或归属不匹配时，在已确认的 appId 下创建并发布替代场景，再写入运行配置。
-4. 外部模型 + 知识库读取 `references/external-llm-knowledge-base.md`，验证 `docqa,<nlpType>` 调用链。
-5. Android/Web 实现使用 `avatar-executing/references/` 下真实 Playbook，不使用快速概念指南生成代码。
-6. Web SDK 自建先执行 `tools/sdk_artifact.py ensure`；返回 `blocked_missing_sdk` 时保持当前 workflow，不生成“手动下载后即可运行”的假交付。
-7. Web 交付前执行 `tools/web_sdk_gate.py check`；只有退出码 0 / `ready_to_deliver` 才能标记完成，`needs_runtime_verification` 仍是同一 workflow。
-8. 完成安全、构建、运行和目标交互验证；外部阻塞必须明确记录。
+---
 
-## 执行原则
+## 决策分支（场景 → 路由目标）
 
-- 直接运行可自动完成的命令，用户只处理扫码、授权或人工视觉/听觉确认。
-- 遇到交付模式或语音门禁缺失时，先询问用户，不执行工程修改或平台写操作。
-- 快速模式不加载或生成 spec/plan/writer/reviewer 内容。
-- 只有独立任务确实能并行且不会共享写入时才考虑子 agent；快速模式默认由主 agent 完成。
-- 遇到外部阻塞时给出恢复条件，不用长篇过程文档代替解决问题。
+| 场景 | 典型信号 | 路由目标 | 优先级 |
+|------|----------|----------|--------|
+| 故障排查 | 失败/报错/黑屏、错误码、日志、`avatar authentication failed`、1008/10113/10114/10120/10121 | avatar-troubleshoot | highest |
+| 权限问题 | 权限拒绝、麦克风/摄像头 | avatar-permissions-setup | high |
+| 网络问题 | 连接/超时/断开、10200/10201 | avatar-network-debug | high |
+| 配置调整 | 调整/修改、分辨率/码率/形象 | avatar-config-authoring | high |
+| Web 对话模板 | 智能客服/H5/大屏、用模板快速生成对话页 | avatar-web-template | high |
+| 数字人直播 | 直播间/虚拟主播/带货/分镜 | avatar-live-streaming | high |
+| WebAPI 报文接入 | WebAPI/web api/报文/协议/不用SDK/直连WebSocket/请求响应/ctrl/event_type | avatar-webapi-protocol | high |
+| 知识库管理 | 知识库/docqa/RAG/上传文档/知识问答/文档检索 | avatar-knowledge-base | high |
+| 首次接入 | 集成/接入/从零、SDK 未集成 | avatar-brainstorming | medium |
+| 功能扩展 | 添加/新增、语音交互/动作控制 | avatar-brainstorming | medium |
+| 文档查询 | 如何/怎么、无实施意图 | provide_docs | low |
 
-## References
+- 完整关键词 / 指标映射：见 `references/routing-rules.md`
+- 各路由目标的输入 / 输出说明：见 `references/route-targets.md`
+- 各置信度下的完整示例：见 `references/examples.md`
 
-- `../avatar-shared/delivery-modes.md`：快速/严格模式选择、门禁和 token 纪律
-- `references/routing-rules.md`：意图优先级和边界
-- `references/routing-flow.md`：路由步骤
-- `references/route-targets.md`：目标输入输出
-- `references/examples.md`：路由示例
-- `references/external-llm-knowledge-base.md`：外部模型与 docqa 组合链路
+鉴权错误特例：命中 `avatar authentication failed`、`authorization invalid`、WebSocket 1008 或
+10110/10113/10114/10120/10121 时，路由到 `avatar-troubleshoot`，并要求其读取
+`../avatar-troubleshoot/references/authentication-failed.md`。不得直接回复“重新复制凭据”或“发布场景”，也不得把通用鉴权失败
+改路由成纯网络问题；先取得平台错误说明、关闭码或 app/scene/授权查询证据再定因。
+
+---
+
+## 外部LLM + 讯飞知识库集成（路由增强：识别后按原生链路处理）
+
+**触发条件**：用户需求中**同时**出现以下信号：
+- 外部LLM关键词：DeepSeek / GPT / Claude / ChatGPT / 通义千问 / 文心一言 / 外部模型 / 第三方模型
+- 讯飞能力关键词：讯飞知识库 / docqa / NLP / 星火 / 虚拟人对话 / 大模型对话
+
+**关键事实（不是冲突）**：讯飞平台支持把外部 LLM（DeepSeek/GPT 等）注册为**自有模型**
+（`python tools/xfyun_model_manage.py create`，modelType=2，`nlpType=openai`，走 OpenAI 兼容端点）。知识库（docqa）
+的检索结果可以通过调用链 `docqa,<自有模型>` 灌给这个外部模型生成答案——**并非只能对接星火**。
+调用链 `nlpAssistantInfo` 是**原样可配置字符串**，`docqa,openai` 与 `docqa,xinghuo` 同等有效。
+
+**原生集成链路（DeepSeek + 健身知识库为例）**：
+1. `python tools/xfyun_model_manage.py create <name> <model> <introduce> <apiUrl>` 注册 DeepSeek；apiKey 交互输入，nlpType 为 `openai`
+2. `python tools/xfyun_model_manage.py bind <sceneId> <modelName>` 把 DeepSeek 绑定到场景
+3. `python tools/xfyun_knowledge.py create-kb <name>` 与 `upload <libId> <file...> --wait` 建库并上传文档
+4. `python tools/xfyun_knowledge.py enable <sceneId> <libId> --chain docqa,openai` 关联知识库并默认自动发布
+5. 用 `xfyun_knowledge.py status`、`xfyun_model_manage.py query` 和 `query-interact` 验证知识库、模型与 `docqa,openai` 链路
+
+**处理流程**：
+- 识别到该组合 → **不中断路由**，直接路由到 `avatar-brainstorming`（首次接入/建项目）或
+  `avatar-knowledge-base`（已有场景只需配知识库），并在规划中标注"DeepSeek 走自有模型 + `docqa,openai` 链路"
+- 仅当用户明确表示"不想把密钥托管到讯飞平台/要完全自建 RAG"时，才改走 App/后端自建 RAG 方案
+
+**HARD-GATE**：给外部 LLM 挂知识库时，`enable`/`chain` 的调用链第二段**必须**是绑定模型的
+nlpType（自有模型=`openai`），写成 `docqa,openai`。沿用默认 `docqa,xinghuo` 会导致知识库检索
+结果被喂给星火而非 DeepSeek。
+
+**示例**：
+```
+用户："构建基于健身知识库的虚拟人对话安卓项目，用DeepSeek模型"
+检测到：DeepSeek(外部LLM) + 知识库(讯飞能力) → 原生可集成，无需自建RAG
+输出：路由到 avatar-brainstorming，标注"DeepSeek 注册为自有模型(openai) + docqa,openai 链路挂健身知识库"
+```
+
+---
+
+## 交付形态澄清（HARD-GATE：宽泛"构建对话项目"需求）
+
+当用户表达的是**宽泛的"构建 / 搭建 / 做一个 虚拟人对话项目 / 应用"**，且**未指明交付形态**时，
+**不要**默认跳进 SDK 自建（avatar-brainstorming）访谈。先用 `平台交互提问` 澄清路径，再路由：
+
+| 路径 | 交付物 | 路由目标 | 适合 |
+|------|--------|----------|------|
+| 官方模板 | 零代码、开箱即用的可访问链接 | avatar-web-template | 智能客服 / H5 / 大屏，想快速拿链接 |
+| 数字人直播 | 营销带货直播间（商品 / 分镜 / 脚本） | avatar-live-streaming | 虚拟主播、带货直播场景 |
+| 接 SDK 自建 | 真正的前端 / 客户端工程项目 | avatar-brainstorming → avatar-executing | 需要定制 UI、深度集成、控制交互细节 |
+
+判定规则：
+- 用户信号明确偏向某一路径（如"用模板""要个链接" / "直播""带货""虚拟主播" / "接 SDK""自己写前端""要个工程"）→ 直接路由，不必再问
+- 信号不明确（如仅"构建一个虚拟人对话项目"）→ 先 `平台交互提问` 让用户在上述路径中选择，再路由
+- **不要**在澄清中列出尚未支持的交付形态，只呈现当前可交付的路径
+
+---
+
+## 方法论增强（横切能力，非意图路由目标）
+
+上表是"用户意图 → 业务 skill"的路由。另有一类跨领域方法论 skill（`skills/avatar-shared/`），
+不是用户开口要的东西，而是**在执行编码/多任务时自动应用**。路由到实施类目标
+（brainstorming/executing 等）时，若命中以下场景，一并提示应用对应方法论：
+
+| 场景信号 | 应用方法论（skills/avatar-shared/） | 落地位置 |
+|----------|------------------------------|----------|
+| 要写可单测的业务逻辑/函数/模块、或修逻辑 bug | test-driven-development（先写失败测试再实现） | avatar-executing Step 3 |
+| 手头有多个**互不依赖、不写同一文件**的任务 | dispatching-parallel-agents（并行分发子 agent） | avatar-planning 标注 + avatar-executing Step 3 |
+
+说明：这两个是**增强**不是门禁——SDK 真机交互无法单测的部分不套 TDD（走
+avatar-verification 运行时验证）；有依赖的任务不并行（仍串行）。
+
+---
+
+## 关键约束
+
+### 优先级规则（HARD-GATE）
+
+故障排查 > 权限/网络问题 > 配置调整 > 首次接入/功能扩展
+
+多个信号命中时，**必须**按上述优先级选择路由目标。
+
+### 置信度阈值（HARD-GATE）
+
+- **> 0.8**：直接路由
+- **0.5 - 0.8**：询问用户确认
+- **< 0.5**：回退到 avatar-brainstorming 完整流程
+
+### Red Flags
+
+- 工程扫描结果与用户描述矛盾（如称"已集成"但扫描无 SDK）→ 以扫描结果为准并提示用户
+- 同时命中故障排查与配置调整 → 优先故障排查
+- 需求模糊且平台未知 → 不要猜测，回退完整流程澄清
+
+### 其他注意事项
+
+- **工程扫描**：利用缓存避免重复扫描，扫描结果作为路由决策依据
+- **用户体验**：明确问题快速路由，模糊需求走完整流程，避免过度询问
+
+### 执行原则（HARD-GATE：路由到实施类目标后适用）
+
+- **第一条消息就走 skill**：avatar 相关需求一进来就调用本入口做路由，**不要**先用通用知识
+  抛技术选型问题（如 Unity / Three.js / 2D-3D）。本平台走讯飞官方能力，通用选型问答是跑偏。
+- **主动执行，最小化用户手动操作**：涉及命令行工具的步骤由 Claude 直接用 Bash/PowerShell 执行，
+  **不要**让用户在输入框自己输命令（`! ...`）。跑命令、切目录、打开浏览器都是 Claude 的工作。
+- **浏览器交互分工**：需要浏览器的命令（登录、create、publish）直接执行且**默认不加 `--no-browser`**，
+  让浏览器自动弹出；用户只负责浏览器里的人类动作（扫码、测试对话）。**切勿**只贴链接让用户自己打开。
+- **HARD-GATE 前置校验要提前**：如模板路径要求 appType=2，应在 create **之前**用 `list-apps` 校验，
+  别等到 create 被门禁拦下才发现。
+- **阻塞时给明确选项**：遇到无法自动解决的阻塞（如需用户订阅新应用），立刻给出"路径 A / 路径 B"
+  式的可选方案 + 各自 trade-off + 相关链接，而不是只报告问题。
+- **平台端点由工具持有，模型无权补全**：Web SDK 的唯一服务地址是
+  `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact`。控制台只能通过
+  `python "<plugin-root>/tools/xfyun_common.py" projects` 打开。不得询问用户 `WS_URL`，
+  不得根据域名规律拼接或手工执行其他控制台 URL。
+- **阻断必须继续确定性流程**：`web_delivery.py` 返回退出码 2 时，读取 JSON 的 `next_action` 并立即执行；
+  `blocked_missing_credentials` 必须进入 `avatar-credentials`，不能退回通用知识回答或让用户提供 WS 地址。
+- **门禁与上报由状态机负责**：退出码 2/3 保持 workflow 为 `in_progress` 并进行非终态门禁上报；
+  只有退出码 0 / `ready_to_deliver` 才完成上报。模型不得直接调用 Reporter 改写结论。
+- **⚠️ SDK 自建工程按 workflow_mode 分流（Android/Web）**：
+  - `quick`：`avatar-brainstorming` 形成内存实施摘要后**直接**调用 `avatar-executing`，主 agent 依
+    Playbook 实现；不生成 design-spec/implementation-plan，不跑 writer-reviewer 循环。
+  - `strict`：完整走 `avatar-brainstorming` → `avatar-planning` → `avatar-executing`，保留
+    spec/plan/code 评审与完整报告。
+  - **两种模式都不允许**跳过 `avatar-executing` 的真实 Playbook：主 agent 凭记忆手写代码会用错 API
+    （Android 的 `createStreamPlayer`/`sendText` 等不存在，Web 会踩 bitrate 陷阱、前端硬编码
+    apiSecret），导致编译失败、黑屏或构建 20+ 分钟。
+  - Web SDK 自建只能执行
+    `python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<text|voice|audio>"`；
+    状态机固定完成完整凭据、canonical auth 模块、SDK、服务状态和服务端签名校验。浏览器证据产生后重复同一命令，内部才运行最终 gate 和完成上报。
+  - **Web 骨架与状态机边界**：`avatar-executing` 可在凭据和 SDK 尚未就绪时先创建最小
+    `server.js` / `public/app.js` / `package.json` 骨架。`web_delivery.py` 不是代码生成器，且第一项检查就是
+    `server.js` 是否已存在；不存在时返回 `blocked_server_lifecycle` + `server_js_missing`。骨架存在后才运行
+    `web_delivery.py run` 编排凭据、canonical auth、SDK、服务和门禁；用
+    `web_delivery.py status --project "<project>"` 读取持久化状态。
+  - Web 前端固定调用 `GET /api/avatar-auth -> {signedUrl,timestamp}` 与
+    `GET /api/config -> {appId,sceneId,avatarId,vcn,wsUrl}`，然后
+    `setApiInfo({signedUrl, appId, sceneId})`。`apiKey/apiSecret` 只保存在 Node 服务端，禁止传入前端。
+  - 退出码 2/3 都不得完成，只有退出码 0 / `ready_to_deliver` 才能交付。禁止手写/读取 `.env`、手写运行证据、全局结束 Node、直接运行 `web_sdk_gate.py` 或 Reporter complete；端口只使用工具返回的实际 URL。
+  - Android 构建必须同时遵循 `../avatar-shared/android-gradle-stability.md`：串行构建、在线预热、
+    `--offline` 复验，超时先查原进程而不是重复执行。
+
+---
+
+## references/ 索引
+
+| 文件 | 内容 |
+|------|------|
+| `references/routing-rules.md` | **路由规则唯一权威来源**：意图优先级、关键词/指标映射、边界规则 |
+| `references/routing-flow.md` | 三步路由流程的完整 JavaScript 实现 |
+| `references/route-targets.md` | 各路由目标的适用场景、输入、输出 |
+| `references/examples.md` | 各置信度场景的完整路由示例 |
+| `../avatar-shared/delivery-modes.md` | `workflow_mode: quick\|strict` 的选择、必问门禁、Token 纪律 |
+| `../avatar-shared/android-gradle-stability.md` | Android Gradle 镜像、内存/并发、缓存锁与超时处理 |
+
+本文件的"决策分支"表只是快速索引；出现分歧时以 `references/routing-rules.md` 为准。
+
+---
+
+## 输出格式
+
+### 成功路由
+```yaml
+status: "routed"
+target: "avatar-troubleshoot"
+confidence: 0.95
+reason: "明确的错误码和异常行为"
+```
+
+### 需要确认
+```yaml
+status: "needs_confirmation"
+suggested_target: "avatar-config-authoring"
+confidence: 0.75
+question: "检测到您想调整虚拟人分辨率，是否需要我帮您修改配置？"
+```
+
+### 回退到完整流程
+```yaml
+status: "fallback_to_full_workflow"
+target: "avatar-brainstorming"
+reason: "需求不明确，需要完整的澄清流程"
+```
+
+---
+
+## 相关技能
+
+- `avatar-brainstorming`: 完整工作流入口
+- `avatar-troubleshoot`: 故障排查
+- `avatar-config-authoring`: 配置调整
+- `avatar-permissions-setup`: 权限配置
+- `avatar-network-debug`: 网络诊断

@@ -4,7 +4,7 @@
 
 ### 全部 PASS
 ```yaml
-保存到 `<plugin-root>/.runtime/dev-env.yaml`：
+保存到 `<plugin-root>/.runtime/dev-env.yaml`:
   platform: web | android | ios
   credentials:
     appId: "xxx"
@@ -16,7 +16,7 @@
     path: "..."
   environment:
     verified: true
-  toolchain:
+  avatar-toolchain:
     verified_at: "2026-07-13T10:30:00Z"
   network:
     websocket: "ok"
@@ -63,7 +63,7 @@ resources:
 environment:
   last_verified: "2026-07-13T10:30:00Z"
   
-toolchain:
+avatar-toolchain:
   last_verified: "2026-07-13T10:30:00Z"
 
 network:
@@ -102,7 +102,7 @@ rm <plugin-root>/.runtime/dev-env.yaml
     "layer2_resources": "pass",
     "layer3_sdk": "pass",
     "layer4_network": "pass",
-    "layer5_toolchain": "pass",
+    "layer5_avatar-toolchain": "pass",
     "layer6_validation": "pass"
   },
   "config": {

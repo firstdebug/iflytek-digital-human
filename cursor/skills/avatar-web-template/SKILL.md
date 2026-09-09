@@ -1,16 +1,20 @@
 ---
 name: avatar-web-template
 description: >-
-  使用讯飞官方预设模板创建并发布零代码 Web 对话应用。用于用户明确要快速生成 H5、客服页、大屏或可访问链接，并选择 templateId 1、3、4、7 或 11 时。
+  使用讯飞官方预设模板创建 Web 对话应用（零代码生成可访问链接）。由 avatar-workflow-entry
+  路由调用，不应直接匹配用户的宽泛需求。触发条件：已明确要使用官方模板（templateId 1/3/4/7/11）且有 appId。
 ---
 
 # avatar-web-template: Web 对话模板应用
 
-## 运行位置
+## ⚙️ 运行位置（从任意项目调用时必读）
 
-从本文件路径 `<plugin-root>/skills/avatar-web-template/SKILL.md` 反推 `<plugin-root>`。
-脚本 `tools/xfyun_template.py` 和配置 `config/tools.yaml` 均以插件根目录为基准；不要依赖用户名、当前工作目录或固定安装路径。
-执行命令时将工作目录设为 `<plugin-root>`，或使用解析后的绝对路径。
+本 skill 依赖的平台脚本与配置在固定位置：
+- 工具根目录：`<plugin-root>`（插件安装目录，Cursor 自动解析为真实路径）
+- 脚本 `tools/xfyun_template.py` · 工具注册表 `config/tools.yaml`
+
+正文中的 `python tools/xxx.py` 等**相对路径均以该根目录为基准**。
+从其他项目目录执行时，先 `cd "<plugin-root>"` 再运行，或改用绝对路径前缀。
 依赖：Python 3.8+ 与 requests/playwright/cryptography；首次使用需浏览器登录（见 avatar-credentials）。
 
 ## 定位
@@ -89,11 +93,11 @@ python tools/xfyun_template.py publish <sceneId> --domain <域名> --expire <毫
 3. **配置后需重新发布** — update-bg/update-avatar 修改后，必须再次 `publish` 才生效
 4. **模板预设不可变** — 每个模板的 widgets 布局、尺寸为固定预设，不能改
 5. **背景图 URL 可能过期** — 官方默认背景旧 URL 报 403 时需换新图（`curl -I` 验证 200）
-6. **浏览器免登录** — 跳转时复用 `xfyun_common.py` 管理的公共 Cookie 登录态
-7. **交互模式默认打开浏览器** — create/publish 命令由 Cursor Agent 执行且**默认不加 `--no-browser`**，
+6. **浏览器免登录** — 跳转时复用 `xfyun_cookies.json` 登录态
+7. **交互模式默认打开浏览器** — create/publish 命令由 Claude 执行且**默认不加 `--no-browser`**，
    让脚本自动打开浏览器标签页（访问链接 + 配置页），用户可立刻测试对话。**切勿**只把链接
    打印出来让用户自己复制粘贴去浏览器打开。只有批量创建 / CI / 无头场景才用 `--no-browser`。
-8. **命令由 Cursor Agent 执行** — 所有 `python tools/...` 命令通过终端工具直接运行，
+8. **命令由 Claude 执行** — 所有 `python tools/...` 命令用 Bash/PowerShell 工具直接跑，
    不要让用户在输入框自己输命令。用户只负责浏览器里的人类动作（扫码、测试对话）。
 
 ---
@@ -125,6 +129,21 @@ Web 对话模板任务
 
 ---
 
+## 交付收尾（必做）
+
+拿到可访问链接后，把交付物记录到 `.runtime/artifacts.json` 并上报完成：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"template_url": "<实际访问链接>", "scene_id": "<sceneId>"}
+EOF
+python "<plugin-root>/tools/telemetry.py" complete --type web_template
+```
+
+链接未生成或未发布成功时**不要**执行上述命令。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 appId 等凭据
@@ -132,4 +151,3 @@ Web 对话模板任务
 - `avatar-knowledge-base`: 给模板应用挂知识库
 - `avatar-live-streaming`: 直播场景的模板（营销带货）
 - `avatar-config-authoring`: 已有项目的配置调整
-

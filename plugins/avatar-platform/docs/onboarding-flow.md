@@ -57,7 +57,7 @@
 当我检测到需要凭据时(你说要集成、或任务需要 appId),会自动调用 `avatar-credentials` skill:
 
 1. 调用 `xfyun_login.py`,打开浏览器让你登录
-2. 登录成功后，Cookie 默认保存到插件根目录 `.runtime/xfyun_cookies.json`（已在 `.gitignore` 中忽略），可用 `XFYUN_AVATAR_COOKIE_FILE` 覆盖
+2. 登录成功后,凭据保存到本地文件 `xfyun_cookies.json`(已在 `.gitignore`,不会进 git)
 3. 从文件读取 appId/apiKey/apiSecret
 
 **你要做什么**:在弹出的浏览器里输入平台账号密码,登录即可。登录一次,凭据持久化,下次不用重复。
@@ -138,6 +138,11 @@
 
 ### 5B. SDK 开发(编程接入)
 
+工程文件骨架可以先按 `avatar-executing` 的平台 Playbook 创建；凭据和 SDK 是启动真实链路的门禁，
+不是创建空骨架的门禁。Web 场景下先创建 `server.js` 等最小文件，再运行 `web_delivery.py run`。
+`web_delivery.py` 不生成工程文件：缺少 `server.js` 时会先返回
+`blocked_server_lifecycle` / `server_js_missing`。
+
 1. **环境检查**(`avatar-preflight`):Node/npm 版本、防火墙、依赖安装
 2. **下载 SDK**(`avatar-artifact-download`):自动下载对应平台 SDK
 3. **工具链验证**(`avatar-toolchain`):检查构建工具(Vite/Webpack/Gradle/Xcode)
@@ -206,7 +211,7 @@ A:可以。一个账号可以订阅多个应用,类型可以不同。比如你�
 路由决策(avatar-workflow-entry)
     ↓
     ├→ Web 模板 / 直播 → avatar-web-template / avatar-live-streaming
-    ├→ SDK 开发 → avatar-brainstorming → avatar-preflight → avatar-artifact-download → avatar-toolchain → avatar-integration-guides → 功能集成
+    ├→ SDK 开发 → avatar-brainstorming → preflight → artifact-download → avatar-toolchain → avatar-integration-guides → 功能集成
     ├→ WebAPI 接入 → avatar-webapi-protocol → auth → protocols → demo-build → responses
     └→ 故障排查 → avatar-troubleshoot
 ```

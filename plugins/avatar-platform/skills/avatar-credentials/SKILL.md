@@ -1,149 +1,284 @@
 ---
 name: avatar-credentials
 description: >-
-  获取、验证并写入讯飞虚拟人平台凭据，包括 appId、apiKey、apiSecret 和 sceneId。用于创建接口服务、自动登录控制台、检查资源授权或为项目生成环境变量时。
+  平台凭据获取与验证工具。由 avatar-workflow-entry
+  路由调用。触发条件：已明确需要创建接口服务、获取/验证凭据（appId/apiKey/apiSecret/sceneId 等）。
 ---
 
 # avatar-credentials: 凭据获取和验证
 
-## 运行位置
+## ⚙️ 运行位置（从任意项目调用时必读）
 
-从本文件反推 `<plugin-root>`，并在插件根目录执行 `tools/xfyun_*.py`。Cookie 默认保存到 `<plugin-root>/.runtime/xfyun_cookies.json`；用 `XFYUN_AVATAR_COOKIE_FILE` 可覆盖。不要依赖用户名、当前工作目录或安装缓存路径。
+本 skill 依赖的平台脚本与配置在固定位置：
+- 工具根目录：`<plugin-root>`（插件安装目录，Codex 自动解析为真实路径）
+- 脚本 `tools/xfyun_*.py` · 工具注册表 `config/tools.yaml`
 
-## 必需数据
+正文中的 `python tools/xxx.py`、`config/tools.yaml` 等**相对路径均以该根目录为基准**。
+从其他项目目录执行时，先 `cd "<plugin-root>"` 再运行，或改用绝对路径前缀。
+依赖：Python 3.8+ 与 requests/playwright/cryptography；首次使用需浏览器登录。
 
-| 配置 | 用途 |
-|---|---|
-| `appId` | 应用标识 |
-| `apiKey` / `apiSecret` | WebSocket 鉴权 |
-| `sceneId` | 已发布的接口服务标识 |
-| `avatarId` | 已授权形象 |
-| `vcn` | 已授权发音人 |
+## 定位
 
-首次接入默认使用：
+引导用户获取虚拟人平台凭据，并验证凭据有效性。
 
+**调用时机**:
+- `avatar-preflight` Layer 1 凭据验证
+- 凭据配置错误时
+- 首次接入时
+
+---
+
+## 必需凭据清单
+
+```yaml
+凭据类型: 说明
+  appId: 应用ID，在控制台创建应用后获取
+  apiKey: API 密钥
+  apiSecret: API 密钥对（用于签名）
+  sceneId: 接口服务ID，需发布后才有效
+  avatarId: 形象ID，需要授权才能使用
+  vcn: 发音人ID，与形象绑定
+```
+
+**官方接入指南**: https://www.yuque.com/xnrpt/bbc1du/usyebvyczgcy23pk
+**控制台地址**: https://virtual-man.xfyun.cn/console/projects
+**WebSocket 地址**: wss://avatar.cn-huadong-1.xf-yun.com/v1/interact
+
+`WS_URL 是平台常量`，不是用户凭据，也不是可选输入。必须由 `write_env_safe.py` 自动写入；不得询问用户、
+不得接受模型生成的替代 host/path。打开项目控制台必须执行：
+
+```bash
+python "<plugin-root>/tools/xfyun_common.py" projects
+```
+
+不得自行拼接控制台 URL 或用 `start https://...` 绕过该命令。
+
+---
+
+## 核心工作流概览
+
+| 阶段 | 目标 | 详见 |
+|------|------|------|
+| 0. 工具检测 | 检测是否有自动化工具（query-services）| 本页 "工具增强" |
+| 1. 登录与应用检查 | 登录平台 → 检查应用列表 → 判断 appType/授权 | `references/app-authorization-check.md` |
+| 2. 控制台获取 | 申请服务 → 创建接口项目 → 发布 → 获取 6 项凭据 | `references/console-setup-guide.md` |
+| 3. 交互式引导 | 逐步引导用户输入凭据、保存到 `.env` | `references/interactive-guide.md` |
+| 4. 格式验证 | 本地正则校验凭据格式 | `references/validation.md` |
+| 5. 在线验证 | WebSocket 连接测试凭据有效性 | `references/validation.md` |
+| 6. 排障 | 根据错误码定位问题 | `references/error-codes.md` |
+
+---
+
+## 工具增强（自动化获取凭据）
+
+如果用户提供了 `xfyun-tools`（见 `config/tools.yaml`）：
+
+### 检测流程
+```bash
+# 检测工具是否存在
+if [ -f tools/xfyun_query_services.py ]; then
+    echo "✅ 检测到讯飞工具集"
+    # 询问用户是否使用自动获取
+fi
+```
+
+### 自动获取流程（推荐）
+
+**第 0 步：切换到插件根目录（HARD-GATE）**
+```bash
+# 所有工具调用必须在插件根目录执行
+cd "<plugin-root>"
+# 插件根目录示例：<安装路径>\<平台插件目录>\avatar-platform
+```
+
+**第 1 步：验证登录状态**
+```bash
+# 检查 cookie 是否存在
+ls tools/xfyun_cookies.json
+
+# 如果不存在或过期，拉起浏览器登录
+python tools/xfyun_common.py login
+# 浏览器弹出登录页 → 用户完成登录 → 自动保存 cookie
+# 强制重新登录：python tools/xfyun_common.py login --force
+```
+
+**第 2 步：查询场景列表（密钥自动脱敏）**
+```bash
+python tools/xfyun_query_services.py
+
+# 输出格式（密钥已脱敏）:
+# [场景 1]
+#   场景名称: 学习帮手
+#   场景 ID:  336130030977552384
+#   App ID:   YOUR_APP_ID
+#   API Key:    xxxx********xxxx
+#   API Secret: xxxx********xxxx
+```
+
+**第 3 步：写入完整凭据到 .env（密钥不进对话）**
+```bash
+# 使用安全脚本，完整密钥从平台 API 获取，直接写入 .env
+python tools/write_env_safe.py <app_id> <scene_id> <output_path>
+
+# 示例
+python tools/write_env_safe.py YOUR_APP_ID 336130030977552384 ~/.env
+
+# 输出（仅显示脱敏版本）：
+# [OK] API Key:    xxxx********xxxx
+# [OK] API Secret: xxxx********xxxx
+# [完成] 凭据已写入: <项目路径>/.env
+# [安全] 密钥未打印到控制台，仅存储在本地文件
+```
+
+**第 4 步：确认默认配置（自动完成）**
+
+工具会自动设置通用默认值：
 - 形象 ID：`111310001`
 - 发音人：`x4_lingxiaoqi_oral`
 
-保持默认值以减少接入变量。仅在平台明确返回未授权或用户要求更换时，查询当前 `appId` 的可用资产。
+这些值适用于大多数场景，无需手动调整。
 
-## 自动流程
+### 执行分工（HARD-GATE：主动执行，最小化用户手动操作）
 
-1. 在 `<plugin-root>` 运行 `python tools/xfyun_common.py cookie-path`。
-2. 登录态缺失或过期时运行 `python tools/xfyun_common.py login`；需要重登时加 `--force`。
-3. 运行 `python tools/xfyun_query_services.py` 查询应用、场景和脱敏密钥。
-4. 从查询结果选择准确的 `appId` 与 `sceneId`。
-5. 运行 `python tools/write_env_safe.py <appId> <sceneId> <outputPath>`，直接把完整密钥写入目标环境文件。
-6. 进行格式检查、资源授权检查和在线连接验证。
+- **Claude 负责**：执行**所有** python 命令、`cd` 切换目录——用 Bash/PowerShell 工具直接跑。
+- **用户负责**：仅浏览器弹出后的**人类动作**（扫码、输入账号密码、在页面上确认订阅）。
+- **切勿**让用户自己在输入框输命令（如 `! cd ... && python ...`）。登录命令由 Claude 执行，
+  脚本会自动拉起浏览器；把命令推给用户是错误做法。
+- **理解要点**："需要用户手动操作"指的是浏览器里人类才能完成的动作，**不是**让用户代跑命令。
+- **所有工具调用前必须 `cd "<plugin-root>"`**，否则相对路径失效。
 
-## 场景解析与自动修复（HARD-GATE）
+### ⚠️ HARD-GATE：给交互式脚本喂 stdin（Windows 密钥错位血泪教训）
 
-对用户提供的 `sceneId`，先运行场景列表查询并按精确 ID 匹配，再确认：`scene.appId == appId`、场景是接口类型、具备对话能力且发布成功。不能仅凭 `query <sceneId>` 能返回草稿 NLP 配置就判定场景有效。
+`xfyun_model_manage.py create/update` 需要输入 apiKey（`prompt_secret`，getpass/input 交互）。
+**Windows 下必须用 cmd.exe 的 `<` 文件重定向喂 stdin，严禁 PowerShell 对象管道**。
 
-若场景缺失、未发布、归属不匹配、没有对话能力，或最小连接返回 `10114`，按以下顺序执行：
+- ❌ **错误**：`Get-Content resp.txt | python tools\xfyun_model_manage.py create ...`
+  或 `"2`n$key`ny" | python ...` —— PowerShell 对象管道喂 Python stdin **行序会错乱**，
+  实测把正确密钥 `sk-35b...` 存成了错位的 `s-7f41...`（getpass 分支在管道下不可靠）。
+- ✅ **正确**：cmd 重定向给真实文件句柄，`prompt_secret` 的"方式2 从文件读取"稳定逐行读：
+  ```powershell
+  # 1) 密钥单独存文件（api.txt 有多行, 只取 api: 行去前缀 4 字符）
+  $key = (Get-Content api.txt | Where-Object { $_ -like 'api:*' }).Substring(4).Trim()
+  $kf = Join-Path $env:TEMP 'dskey.txt'; Set-Content $kf -Value $key -NoNewline -Encoding ascii
+  # 2) 响应文件: 选2(从文件读取) → 密钥文件路径 → y(确认) → y(读后删除)
+  $resp = Join-Path $env:TEMP 'resp.txt'; Set-Content $resp -Value @('2',$kf,'y','y') -Encoding ascii
+  # 3) cmd 重定向（PowerShell 5.1 不支持 < , 用 cmd 包一层）
+  cmd /c "python tools\xfyun_model_manage.py create <name> deepseek-chat `"简介`" https://api.deepseek.com < `"$resp`""
+  ```
+- update 修改密钥同理：响应文件 `@('5','2',$kf,'y','y')`（选字段5 API Key → 方式2 → 路径 → 确认 → 删除）。
+- 校验：`mask_secret(show_suffix=0)` 显示有 bug（会重复拼原串），**核对密钥看前缀 `sk-` 是否正确即可**。
 
-```text
-1. 保留已验证的 appId，不继续写入旧 sceneId。
-2. python tools/xfyun_interface.py create <appId> <sceneName> --desc <description>
-3. 从工具输出读取新 sceneId，并重新执行 scenes/check/publish/在线连接验证。
-4. 只有全部通过后，使用新 sceneId 覆盖目标 credentials.json 或环境文件。
+### 优势
+- ✅ **凭据不进对话框** —— 脚本直接从控制台 API 获取，写入 .env
+- ✅ **自动脱敏显示** —— 交互时只显示脱敏值
+- ✅ **支持多场景** —— 一次查询所有场景，用户选择
+- ✅ **安全加密存储** —— 可选的加密本地存储（xfyun_secrets.py）
+
+### Fallback
+如果工具不存在或执行失败，自动降级到 `references/interactive-guide.md` 的手动流程。
+
+---
+
+## 凭据对照表
+
+| 配置项 | 变量名 | 说明 |
+|--------|--------|------|
+| 应用 ID | `APP_ID` / `appId` | 控制台应用 AppId |
+| 接口密钥 | `API_KEY` / `apiKey` | 控制台应用 ApiKey |
+| 接口密钥 Secret | `API_SECRET` / `apiSecret` | 控制台应用 ApiSecret |
+| 接口服务 ID | `SCENE_ID` / `sceneId` | 控制台接口服务 ID（必须已发布） |
+| 形象 ID | `AVATAR_ID` / `avatarId` | 已授权虚拟人形象 ID |
+| 发音人 | `VCN` / `vcn` | 已授权发音人标识 |
+
+---
+
+## 决策分支（场景 → 应读哪个 reference）
+
+```
+凭据获取任务
+├── 检测到 xfyun-tools？
+│   ├── YES: 使用自动化工具
+│   │   ├── 登录: python tools/xfyun_common.py login（在插件根目录执行）
+│   │   ├── 检查应用: POST /app/query → 判断 appType/auths (见 references/app-authorization-check.md)
+│   │   │   ├── 无应用 → 问需求 → 推荐订阅类型 → 给链接 → [等用户订阅]
+│   │   │   ├── 授权不足 → 提示缺什么 → 给链接重订阅 → [等用户订阅]
+│   │   │   └── ✓ 正常 → 存 appType/auths/appId → 继续
+│   │   ├── 查询场景: python tools/xfyun_query_services.py
+│   │   ├── 用户选择场景
+│   │   └── 自动写入 .env（凭据不进对话框）
+│   │
+│   └── NO 或失败: 降级到手动流程
+│       ├── 首次接入 → references/console-setup-guide.md
+│       ├── 交互输入 → references/interactive-guide.md
+│       └── 格式验证 → references/validation.md
+│
+├── 验证凭据有效性
+│   ├── 本地格式校验 → references/validation.md
+│   └── 在线连接测试 → references/validation.md
+│
+└── 连接失败排障
+    ├── 错误码查询 → references/error-codes.md
+    └── 深度诊断 → avatar-network-debug
 ```
 
-创建命令已包含 NLP、交互和发布；发布或验证失败时，查询新场景的实际状态并修复。不得把无效场景写成“草稿可配置”，也不得把“创建新场景”留作用户后续操作或交付文档中的待办项。
+---
 
-完整控制台流程见 `references/console-setup-guide.md`；自动工具不可用时再用 `references/interactive-guide.md`。
+## 关键约束 / HARD-GATE
 
-## 缺凭据时的强制脚本顺序
+- **固定端点门禁**：`WS_URL` 必须精确等于
+  `wss://avatar.cn-huadong-1.xf-yun.com/v1/interact`；host、path、query 任一不同均阻断。
+- **缺凭据恢复门禁**：收到 `blocked_missing_credentials` 时，必须执行返回 JSON 中的 `next_action`：
+  `xfyun_common.py login` → `xfyun_query_services.py` → 携带平台返回的精确 `appId/sceneId` 重跑
+  `web_delivery.py`。不得要求用户提供 `WS_URL`、API 地址或控制台地址。
+- **阻断上报**：可恢复的凭据门禁保持 workflow 为 `in_progress`，由 `web_delivery.py` 自动记录并上传
+  `gate=web_delivery`、`gate_status` 和脱敏后的 `remaining_issues`；不得调用 fail/complete 抢先收口。
+- **必须发布接口服务**：未发布的 scene 不能用于 SDK 连接。但通用 `avatar authentication failed`
+  不能直接判定为未发布，必须转入 `../avatar-troubleshoot/references/authentication-failed.md` 取证。
+- **API_SECRET 只显示一次**：控制台创建后必须立即复制保存，无法二次查看。
+- **只能使用已授权的形象和发音人**：未授权的 avatarId 连接时报错 10120。
+- **默认并发 1 路**：超过路数报错 11203。
+- **凭据格式不作为在线有效性的替代证据**：字段非空、Key/Secret 长度和固定端点只能做本地初筛；
+  appId/sceneId 的归属、类型和状态以平台实时查询为准，不用历史正则拒绝平台返回的合法值。
 
-当上游任务说“有账号但没配好”、未给完整 6 项凭据、或项目里没有有效 `credentials.json` 时，必须先尝试自动获取，不得直接生成占位配置：
+## Red Flags
 
-```text
-1. python tools/xfyun_common.py cookie-path
-2. python tools/xfyun_common.py login        # 无有效 Cookie 时；允许打开浏览器
-3. python tools/xfyun_query_services.py      # 查询应用、场景、脱敏密钥
-4. python tools/xfyun_model_manage.py scenes # 需要确认场景时
-5. python tools/write_env_safe.py <appId> <sceneId> <outputPath>
-```
+- ❌ 凭据配好但出现通用鉴权失败 → 读取 `../avatar-troubleshoot/references/authentication-failed.md`，
+  依次检查真实错误码、canonical 签名、app/scene 归属、发布状态和资产授权，不得跳步定因。
+- ❌ 签名错误 / apiSecret 报错（10113）→ 检查 apiSecret 拼写和签名逻辑。
+- ❌ `.env` 未加入 `.gitignore` → 凭据泄露风险，必须确认 `.env`、`config/credentials.json`、`**/credentials.*` 已忽略。
+- ❌ 超拟人（cnr 开头）不支持透明背景，勿用于需要透明背景的场景。
 
-若任务还包含外部模型或知识库，凭据写入后继续运行对应平台脚本，而不是把配置工作留给用户：
+---
 
-```text
-python tools/xfyun_model_manage.py list|create|bind|publish
-python tools/xfyun_knowledge.py labels|create-label|create-kb|upload|enable|status
-```
+## references/ 索引
 
-仅在以下情况下允许降级为“配置后即可运行”：
+| 文件 | 内容 |
+|------|------|
+| `references/console-setup-guide.md` | 控制台 6 步获取流程、创建应用/接口服务/授权形象/发音人的详细操作与检查代码 |
+| `references/interactive-guide.md` | 交互式引导完整实现（Phase 1-8）：打开浏览器、平台交互提问 采集、保存 `.env`、检查 `.gitignore`、完成提示 |
+| `references/validation.md` | 基础/完整格式验证函数、在线连接验证函数、验证成功/失败输出格式 |
+| `references/config-templates.md` | 凭据存储模板：`.env`、JSON 配置文件、Web/Android/iOS 读取代码 |
+| `references/error-codes.md` | 常见错误码（10110/10113/10120/10121/11203）及修复方式 |
 
-- 用户拒绝登录或无法完成扫码/授权；
-- 账号没有接口服务或对话/文档能力，且需要人工开通；
-- 脚本连续失败并给出明确平台错误、网络错误或权限错误；
-- 用户明确要求离线生成工程，不进行平台写操作。
+**排障优先级**：
+- 凭据相关错误 → 先读本 skill 的 `error-codes.md`
+- WebAPI 报文错误 → 读 `../avatar-webapi-protocol/references/troubleshooting.md`
 
-降级输出必须列出已运行的脚本、成功项、失败项和恢复命令。
-
-## 执行分工
-
-- Codex 负责运行命令、设置工作目录、打开浏览器、查询平台和写入配置。
-- 用户只处理扫码、账号登录、订阅确认等必须由人完成的浏览器操作。
-- 登录、查询、创建接口服务、写入配置和发布是快速接入常规步骤，不增加统一确认门禁。
-- 凭据不要经过对话文本；优先让脚本从平台响应直接写入目标文件。
-
-## 决策分支
-
-| 情况 | 处理 |
-|---|---|
-| 已有有效 Cookie | 直接查询服务，不重复打开浏览器 |
-| Cookie 缺失或过期 | 执行 `login`，等待用户完成浏览器登录 |
-| 账号无可用应用 | 读取 `references/app-authorization-check.md`，打开订阅页面 |
-| 应用授权不匹配 | 报告缺失能力并引导补授权 |
-| 能查询但缺接口场景 | 按控制台指南创建并发布接口服务 |
-| 自动工具失败 | 转交互式流程，不要求用户代跑终端命令 |
-| 格式通过但连接失败 | 读 `references/error-codes.md`，再转 `avatar-network-debug` |
-
-## HARD-GATE
-
-- 接口服务必须发布；未发布的 `sceneId` 不可交付。
-- `sceneId` 只有通过精确归属、发布状态、对话能力和最小连接四项验证后才能交付；任一项失败必须自动创建替换场景或明确阻断，不能继续配置无效场景。
-- `apiSecret` 和自有模型 API Key 不打印完整值，不进入命令行参数或聊天记录。
-- `.env`、`credentials.json` 和其他凭据文件必须加入目标项目 `.gitignore`。
-- `avatarId` 与 `vcn` 必须属于当前应用授权范围。
-- 所有应用和场景匹配使用精确 ID，不用模糊匹配或列表第一项。
-- Windows 下自动化交互式密钥输入时，遵循 `references/windows-secret-input.md`，不使用 PowerShell 对象管道喂给 `getpass`。
-
-## 格式与在线验证
-
-格式规则只能发现明显输入错误，不能替代在线验证。具体正则和 WebSocket 验证见 `references/validation.md`。
-
-验证顺序：
-
-1. 检查必需字段非空和基本格式。
-2. 查询应用授权，确认形象、发音人和场景属于当前应用。
-3. 确认接口服务已发布。
-4. 建立最小连接并等待成功事件或明确错误码。
-5. 仅在在线验证成功后向下游交付凭据文件路径。
-
-## References
-
-- `references/app-authorization-check.md`：应用类型和能力授权检查
-- `references/console-setup-guide.md`：控制台申请、创建、授权和发布
-- `references/interactive-guide.md`：自动工具不可用时的交互式流程
-- `references/validation.md`：格式与在线连接验证
-- `references/config-templates.md`：环境变量和各端配置模板
-- `references/error-codes.md`：常见凭据错误码
-- `references/windows-secret-input.md`：Windows 交互式密钥输入自动化
+---
 
 ## 验证清单
 
-- [ ] 6 项配置齐全
-- [ ] `appId`、场景和授权属于同一应用
+- [ ] 6 项凭据齐全（appId/apiKey/apiSecret/sceneId/avatarId/vcn）
+- [ ] 格式校验通过（见 `references/validation.md`）
 - [ ] 接口服务已发布
-- [ ] 默认或指定的形象与发音人已授权
+- [ ] avatarId 与 vcn 已授权
 - [ ] 在线连接验证成功
-- [ ] 凭据文件已写入且被 Git 忽略
-- [ ] 回复和日志未泄露完整密钥
+- [ ] 凭据已保存到 `.env` 且 `.env` 在 `.gitignore` 中
 
-## 交接
+---
 
-- 上游：`avatar-preflight`
-- 下游：`avatar-artifact-download` 或具体构建流程
-- 连接失败：`avatar-network-debug`
+## 交接协议
+
+- **上游**: `avatar-preflight` 调用本技能验证凭据。
+- **下游**: 凭据就绪后 → `avatar-artifact-download`（SDK 下载）。
+- **排障移交**: 连接失败无法通过错误码解决时 → `avatar-network-debug`。

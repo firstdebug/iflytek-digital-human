@@ -67,7 +67,7 @@ python xfyun_live.py create <appId> "直播间名称"
 1. 打开 `https://passport.xfyun.cn/login`
 2. 用户扫码/密码登录
 3. 轮询检测 `ssoSessionId` 和 `account_id` 两个 Cookie
-4. 提取后默认保存到插件根目录 `.runtime/xfyun_cookies.json`
+4. 提取后保存到 `xfyun_cookies.json`
 
 ### Cookie 关键点
 
@@ -80,10 +80,10 @@ python xfyun_live.py create <appId> "直播间名称"
 
 ### 切换账号
 
-先查询实际 Cookie 路径，删除该文件后再次运行即可重新登录：
+删除 Cookie 文件即可，下次运行会重新登录：
 
 ```bash
-python tools/xfyun_common.py cookie-path
+rm xfyun_cookies.json
 ```
 
 ---
@@ -128,13 +128,13 @@ data = xc.post(session, "https://virtual-man.xfyun.cn/zs_web/scene/query", {
 | 常量 | 默认值 | 说明 |
 |------|--------|------|
 | `LOGIN_URL` | passport.xfyun.cn/login | 登录页地址 |
-| `COOKIE_FILE` | `<plugin-root>/.runtime/xfyun_cookies.json` | Cookie 存储文件；可由 `XFYUN_AVATAR_COOKIE_FILE` 覆盖 |
+| `COOKIE_FILE` | `<plugin-root>/.runtime/xfyun_cookies.json` | Cookie 存储文件，可用环境变量覆盖 |
 | `LOGIN_TIMEOUT` | 300 | 登录超时（秒） |
 | `REQUIRED_COOKIES` | [ssoSessionId, account_id] | 必需的 Cookie |
 
 #### 注意事项
 
-- **80000 错误处理**：`post`/`get`/`put` 检测到 `code=80000` 会提示登录失效并返回 None
+- **80000 错误处理**：公共 HTTP 封装检测到 `code=80000` 会清除本地 Cookie，提示重新运行并返回 None；不会自动弹出登录页
 - **debug 脱敏**：`debug=True` 时会自动脱敏 apiKey/apiSecret/apiUrl 等字段
 - **超时**：所有请求默认 15 秒超时
 
@@ -474,7 +474,7 @@ python xfyun_template.py update-avatar <sceneId> 111322001 x4_yuexiaoni_assist -
 - **模板预设不可变部分**：每个模板的 widgets 布局、尺寸为固定预设
 - **各模板背景图不同**：从抓包提取的官方默认背景（注意旧 URL 可能过期，报 403 时需换新图）
 - **配置后需重新发布**：update-bg/update-avatar 等修改配置后，需再次 `publish` 才生效
-- **浏览器免登录**：跳转时复用公共会话模块管理的 Cookie，注入 Cookie 到 playwright
+- **浏览器免登录**：跳转时复用 `xfyun_cookies.json` 的登录态，注入 Cookie 到 playwright
 
 ---
 
@@ -512,7 +512,7 @@ python xfyun_template.py update-avatar <sceneId> 111322001 x4_yuexiaoni_assist -
 #### 标准流程
 
 ```bash
-# 默认形象/发音人（111310001 / x4_lingxiaoqi_oral）
+# 默认形象/发音人（晓姿-蓝色制服 110117026 / 灵小琪 x4_lingxiaoqi_oral）
 python xfyun_live.py create YOUR_APP_ID "我的直播间"
 
 # 自定义形象和发音人
@@ -532,7 +532,7 @@ python xfyun_live.py query <sceneId>
 
 | 项 | 默认值 |
 |----|--------|
-| 形象 | 默认形象 `111310001` |
+| 形象 | 晓姿-蓝色制服 `110117026` |
 | 发音人 | 灵小琪 `x4_lingxiaoqi_oral` |
 | 背景图 | `.../20240606/9dfc4c95-...jpeg` |
 | 商品 | 商品1 |
@@ -545,7 +545,7 @@ python xfyun_live.py query <sceneId>
 - **资产授权自动处理**：发音人/形象授权失败会警告但继续创建（部分资产可能需人工授权，不影响流程）
 - **发布后即可访问**：创建流程末尾自动发布，直接打开直播间链接看效果
 - **超过场景授权数量**：报此错说明账号场景配额已满，需先删除旧场景
-- **浏览器免登录**：复用公共会话模块管理的 Cookie，无 Cookie 时才拉浏览器登录
+- **浏览器免登录**：复用 `xfyun_cookies.json` 登录态，无 Cookie 时才拉浏览器登录
 
 ---
 
@@ -825,7 +825,7 @@ with open('密钥待填写.txt', 'w', encoding='utf-8') as f:
 ### 安全要点
 
 1. 所有查询输出、导出文件**自动脱敏**
-2. 密钥默认**加密存储**在 `<plugin-root>/.runtime/secrets/`，可用 `XFYUN_AVATAR_SECRETS_DIR` 覆盖，不落明文
+2. 密钥**加密存储**在 `<plugin-root>/.runtime/secrets/`，不落明文
 3. `create`/`update` 不接受命令行传 apiKey，走交互输入
 4. debug 输出自动过滤敏感字段
 5. 完整密钥只存在于加密文件和内存中，不进入日志
@@ -836,7 +836,7 @@ with open('密钥待填写.txt', 'w', encoding='utf-8') as f:
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| 返回 code=80000 | 登录失效或 Cookie 域不对 | 用 `python tools/xfyun_common.py cookie-path` 查询并删除 Cookie 后重新登录 |
+| 返回 code=80000 | 登录失效或 Cookie 域不对 | 工具会清除本地 Cookie；重新运行取凭据流程完成登录 |
 | bind 被拒绝 | app 无对话能力 | 用 caps 查授权，换有能力的场景 |
 | 配置不生效 | 忘记 publish | 运行 publish <sceneId> |
 | 更新模型返回 method not supported | 用了 POST | model/info 必须用 PUT |
@@ -852,7 +852,7 @@ with open('密钥待填写.txt', 'w', encoding='utf-8') as f:
 | 场景创建报"超过场景授权数量" | 账号场景配额已满 | 删除旧场景后重试 |
 | SDK 初始化成功但连不上（600003 / Expected HTTP 101 但收到 200）| 未显式 setServerUrl，走了 AAR 内置测试地址 | SDK 端设 serverUrl=wss://avatar.cn-huadong-1.xf-yun.com/v1/interact |
 | SDK 接口场景连上即断（connect_success 后立刻 disconnect）| 接口场景不含形象/发音人 | SDK 端 AvatarParams 传 avatarId+vcn，并用 xfyun_interface.py auth-avatar 授权 |
-| 默认形象 111310001 授权失败 | 可授权资产因账号而异 | 用 auth-avatar 探测本账号实际可授权的 avatarId |
+| 默认形象 110117026 授权失败 | 可授权资产因账号而异，不能硬编码 | 用 auth-avatar 探测本账号实际可授权的 avatarId（如 118801001）|
 | 各接口间歇性 ProxyError('Unable to connect to proxy') | session 继承了机器代理环境变量 | 已在 build_session 设 trust_env=False 直连修复 |
 
 ---

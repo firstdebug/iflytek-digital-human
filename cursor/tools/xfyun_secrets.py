@@ -14,9 +14,10 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 
 
 def resolve_secrets_dir():
+    """密钥目录默认在插件根目录 .runtime/secrets，可用环境变量覆盖。"""
     override = os.environ.get("XFYUN_AVATAR_SECRETS_DIR")
     if override:
-        return Path(override).expanduser().resolve()
+        return Path(os.path.expandvars(os.path.expanduser(override))).resolve()
     return PLUGIN_ROOT / ".runtime" / "secrets"
 
 
@@ -36,6 +37,8 @@ def mask_secret(value, show_prefix=4, show_suffix=4):
     """
     脱敏显示：sk-1234****abcd
     只显示前后几位，中间打星号
+
+    show_prefix/show_suffix 为 0 时该侧完全不显示，绝不回退成原值。
     """
     if not value:
         return ""

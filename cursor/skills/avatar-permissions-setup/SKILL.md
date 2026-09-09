@@ -1,6 +1,6 @@
 ---
 name: avatar-permissions-setup
-description: 配置讯飞虚拟人 Web、Android 和 iOS 项目的麦克风、相机及运行时权限。用于权限被拒绝、无法录音、无法打开相机或需要补齐平台权限声明时。
+description: 虚拟人录音和相机权限配置指南
 ---
 
 # avatar-permissions-setup: 权限配置
@@ -18,8 +18,6 @@ description: 配置讯飞虚拟人 Web、Android 和 iOS 项目的麦克风、�
 ---
 
 ## 核心工作流概览
-
-权限修改门禁：如果任务是新增语音/录音/摄像头能力，必须先取得用户对该能力的明确确认；没有确认时不得添加 `RECORD_AUDIO`、麦克风说明文案、摄像头权限或运行时申请代码。若任务是排查已有权限错误，可以直接修复缺失声明和运行时申请。
 
 1. 判定运行平台（Web / Android / iOS）
 2. 检查静态权限声明（Manifest / Info.plist / 浏览器环境）
@@ -46,6 +44,12 @@ description: 配置讯飞虚拟人 Web、Android 和 iOS 项目的麦克风、�
 
 ## 关键约束 / HARD-GATE
 
+- **权限修改门禁（新增能力时必须先问）**：如果任务是**新增**语音/录音/摄像头能力，必须先取得
+  用户对该能力的明确确认（含交互形态：按住说话 / 点击开始停止 / 自动 VAD / 全双工）。没有确认时
+  **不得**添加 `RECORD_AUDIO`、麦克风说明文案、摄像头权限或运行时申请代码。
+  用 `平台交互提问` 提问，规则见 `../avatar-shared/delivery-modes.md`。
+  若任务是**排查已有权限错误**（如错误码 20003、Manifest 已声明但运行时崩溃），可以直接修复缺失
+  声明和运行时申请，不需要额外确认。
 - **Web 录音必须 HTTPS 或 localhost**：HTTP 环境下 `getUserMedia` 不可用，这是硬性要求。
 - **Android targetSdkVersion >= 23 必须处理运行时权限**：仅在 Manifest 声明不够，未运行时申请会崩溃。
 - **iOS 必须配置 NSMicrophoneUsageDescription**：未配置说明文案会导致申请直接失败/崩溃。

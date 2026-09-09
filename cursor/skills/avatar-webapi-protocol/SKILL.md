@@ -1,7 +1,11 @@
 ---
 name: avatar-webapi-protocol
 description: >-
-  不使用 SDK，直接通过 WebSocket 接入讯飞虚拟人 WebAPI，构造和解析 JSON 报文。用于后端语言直连、查看请求响应、校验 ctrl 或 event_type 字段、解释 vmr_status 和协议错误码时。
+  讯飞虚拟人 WebAPI（报文）接入——不使用任何 SDK，直连 WebSocket，手工构造 JSON 请求报文、解析 JSON
+  响应报文。当用户想用后端语言(Python/Java/Node)直接对接
+  wss://avatar.cn-huadong-1.xf-yun.com/v1/interact、搭建能看到请求/响应报文的
+  demo、校验报文字段是否合规、解读 event_type/vmr_status/错误码时使用。触发词：WebAPI、web
+  api、报文、协议接入、不用SDK、直连WebSocket、请求响应、ctrl、event_type。
 ---
 
 # avatar-webapi-protocol: WebAPI 报文接入
@@ -14,7 +18,7 @@ description: >-
 
 **与客户端 SDK 类 skill 的本质区别**:
 
-| | SDK 类 Skill（avatar-text-driver/avatar-voice-interact 等） | 本 Skill（WebAPI） |
+| | SDK 类 skill(avatar-text-driver/avatar-voice-interact 等) | 本 skill(WebAPI) |
 |---|---|---|
 | 接入 | 调 SDK 方法 `writeText()` | 手拼 JSON + WebSocket 收发 |
 | 关注 | 播放器/录音器/SDK API | 报文字段、event_type、错误码 |
@@ -40,26 +44,27 @@ WebAPI 报文接入需要 **6 项完整凭据**，且所有参数必须是该场
 
 **推荐方式**：通过平台工具获取
 ```bash
-cd <plugin-root>
+cd "<plugin-root>"
 python tools/xfyun_query_services.py  # 查询场景列表
 python tools/write_env_safe.py <app_id> <scene_id> <output_path>
-# 工具默认写入形象 111310001 和发音人 x4_lingxiaoqi_oral
+# 工具会自动设置默认形象（111310001）和发音人（x4_lingxiaoqi_oral）
 ```
 
 **备选方式**：调用 avatar-credentials skill
 - 走完整的登录 → 查询 → 配置流程
-- 首次接入使用默认形象和发音人；明确未授权时再查询并替换
+- 使用默认形象和发音人配置
 
 ### 参数验证清单（发送 start 之前必查）
 
 - [ ] `app_id` / `api_key` / `api_secret` / `scene_id` 非空
-- [ ] `avatar_id` 和 `vcn` 非空；默认使用 `111310001` 和 `x4_lingxiaoqi_oral`
+- [ ] `avatar_id` 和 `vcn` 非空（工具会自动设置默认值）
 - [ ] 如果报 20016 错误，检查场景授权列表
 
 **默认配置**：
-
 - 形象 ID：`111310001`
 - 发音人：`x4_lingxiaoqi_oral`
+
+这些是通用默认值，适用于大多数场景。如果特定场景未授权，工具会提示切换。
 
 ## 触发条件 / 调用时机
 
@@ -134,11 +139,25 @@ python tools/write_env_safe.py <app_id> <scene_id> <output_path>
 | `references/demo-build.md` | Python 最小可运行 demo:连接→start→驱动→打印收发→ping→stop + 跨平台兼容 |
 | `references/troubleshooting.md` | 实战错误码排查(10163/20016/10113 等)+ 快速定位方案 + 凭据来源决策树 |
 
+## 交付收尾（必做）
+
+demo 跑通（连接建立 + 收到驱动响应）后，记录并上报：
+
+```bash
+mkdir -p .runtime && cat > .runtime/artifacts.json <<'EOF'
+{"scene_id": "<sceneId>", "protocol_verified": true}
+EOF
+python "<plugin-root>/tools/telemetry.py" complete --type webapi_protocol
+```
+
+连接失败或未收到有效响应时**不要**执行。
+
+---
+
 ## 相关技能
 
 - `avatar-credentials`: 获取 app_id/apiKey/apiSecret/sceneId(鉴权前置)
 - `avatar-troubleshoot`: 错误码定位与排障
 - `avatar-text-driver` / `avatar-voice-interact` 等: 走**客户端 SDK** 的接入(与本 skill 互斥,别混用)
 - `avatar-workflow-entry`: 路由入口
-
 

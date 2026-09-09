@@ -24,7 +24,7 @@
 - Gradle 7.5（150MB，约 30 秒，腾讯云镜像）
 - Android SDK（135MB，约 2 分钟，官方 CDN）
 
-**交互提问 交互**:
+**平台交互提问 交互**:
 ```yaml
 question: "检测到以下工具缺失。我可以自动安装（约 4 分钟，占用 465MB 磁盘），或你自己手动安装。如何处理？"
 header: "工具链安装"
@@ -167,7 +167,7 @@ cmdline-tools 下载失败，建议安装 Android Studio（包含完整 SDK）�
 ## 执行流程示例
 
 ```python
-def layer5_android_toolchain_check(project_path):
+def layer5_android_avatar-toolchain_check(project_path):
     """Layer 5: Android 工具链检查（优化版）"""
     
     # Step 1: 检测并分类
@@ -214,7 +214,7 @@ def layer5_android_toolchain_check(project_path):
         user_choice = ask_user_auto_install_options(confirm_required)
         if user_choice != "manual":
             execute_auto_install(confirm_required, user_choice)
-            return layer5_android_toolchain_check(project_path)  # 重新检查
+            return layer5_android_avatar-toolchain_check(project_path)  # 重新检查
         else:
             show_manual_install_guide(confirm_required)
             return {"status": "blocked"}
@@ -300,7 +300,7 @@ private static String[] buildRequiredPermissions() {
 ls app/libs/*.aar 2>/dev/null
 
 # 未找到时询问
-交互提问:
+平台交互提问:
   - 选项1: 指定 AAR 路径
   - 选项2: 自动下载到 app/libs/
   - 选项3: 稍后手动添加

@@ -1,6 +1,6 @@
 ---
 name: avatar-action-control
-description: 配置讯飞虚拟人的独立动作与 AIR 自动动作。用于触发挥手、点头等动作，联动播报动作，或调整自动动作策略时。
+description: 虚拟人动作控制（独立动作和自动动作 AIR）
 ---
 
 # avatar-action-control: 动作控制

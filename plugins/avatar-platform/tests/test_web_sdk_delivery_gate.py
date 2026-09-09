@@ -13,6 +13,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 
 import sdk_artifact
 import web_sdk_gate
+import websocket_auth
 
 
 SDK_TYPES = """
@@ -41,6 +42,7 @@ def write_valid_project(root):
     entry.write_text("export default class AvatarPlatform {}", encoding="utf-8")
     (sdk_dir / "index.d.ts").write_text(SDK_TYPES, encoding="utf-8")
     result = sdk_artifact.ensure_artifact("web", root)
+    websocket_auth.install(root)
 
     (root / ".env").write_text(
         "\n".join(
@@ -58,8 +60,9 @@ def write_valid_project(root):
     )
     (root / "server.js").write_text(
         """
-const signatureOrigin = `host: ${host}\\ndate: ${date}\\nGET ${path} HTTP/1.1`;
-const authorization = `headers="host date request-line"`;
+import { avatarAuthHandler, avatarConfigHandler } from './xfyun-auth.mjs';
+app.get('/api/config', avatarConfigHandler);
+app.get('/api/avatar-auth', avatarAuthHandler);
 """,
         encoding="utf-8",
     )
@@ -197,6 +200,58 @@ class WebSdkGateTests(unittest.TestCase):
             self.assertEqual(result["status"], "ready_to_deliver")
             self.assertTrue(result["ready_to_deliver"])
             self.assertEqual(result["remaining_issues"], [])
+
+    def test_core_runtime_success_ignores_generic_resource_404(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_valid_project(root)
+            runtime = root / ".runtime"
+            runtime.mkdir(exist_ok=True)
+            (runtime / "web-runtime-evidence.json").write_text(
+                json.dumps({
+                    "source": "playwright",
+                    "connected": True,
+                    "stream_start": True,
+                    "first_frame": True,
+                    "target_interaction": "voice",
+                    "target_interaction_passed": True,
+                    "errors": [
+                        "Failed to load resource: the server responded "
+                        "with a status of 404 (Not Found)"
+                    ],
+                }), encoding="utf-8")
+
+            result = web_sdk_gate.run_checks(
+                root, required_interaction="voice",
+                node_check=pass_node_check, server_smoke=pass_server_smoke)
+
+            self.assertTrue(result["ready_to_deliver"])
+            self.assertEqual(result["runtime_issues"], [])
+
+    def test_authentication_failure_blocks_completion_before_success_flags(self):
+        for error in ("avatar authentication failed",
+                      {"code": 11203, "message": "concurrency exceeded"}):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                write_valid_project(root)
+                runtime = root / ".runtime"
+                runtime.mkdir(exist_ok=True)
+                (runtime / "web-runtime-evidence.json").write_text(
+                    json.dumps({
+                        "source": "browser",
+                        "connected": True,
+                        "stream_start": True,
+                        "first_frame": True,
+                        "target_interaction": "text",
+                        "target_interaction_passed": True,
+                        "errors": [error],
+                    }), encoding="utf-8")
+                result = web_sdk_gate.run_checks(
+                    root, required_interaction="text",
+                    node_check=pass_node_check, server_smoke=pass_server_smoke)
+                self.assertFalse(result["ready_to_deliver"])
+                self.assertEqual(result["runtime_issues"][0], "authentication_failed")
+                self.assertIn("runtime_errors", result["runtime_issues"])
 
     def test_short_masked_secret_is_rejected_without_exposing_value(self):
         with tempfile.TemporaryDirectory() as temp_dir:

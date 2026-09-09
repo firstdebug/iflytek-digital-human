@@ -1,6 +1,6 @@
 ---
 name: avatar-audio-driver
-description: 使用 PCM 或音频数据直接驱动讯飞虚拟人口型和播报。用于接入音频驱动、分片发送音频，或排查音频格式与时序问题时。
+description: 音频驱动功能实现指南（用音频数据直接驱动虚拟人口型和播报）
 ---
 
 # avatar-audio-driver: 音频驱动

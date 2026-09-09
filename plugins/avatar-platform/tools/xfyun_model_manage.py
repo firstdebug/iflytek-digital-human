@@ -33,7 +33,7 @@
 
 安全特性：
   - 所有密钥字段（apiKey/apiSecret/apiUrl）自动脱敏显示
-  - 创建模型时密钥交互式输入（不回显）并加密存储到插件 .runtime 目录
+  - 创建模型时密钥交互式输入（不回显）并加密存储到 `<plugin-root>/.runtime/secrets/secrets.enc`
   - debug 输出自动过滤敏感字段
 """
 import sys
