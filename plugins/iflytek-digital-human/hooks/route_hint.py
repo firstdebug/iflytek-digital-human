@@ -25,14 +25,9 @@ def _consent_phase(prompt):
     return "initial_avatar"
 
 
-def _is_consent_followup(payload, prompt):
-    session_id = payload.get("session_id") or payload.get("sessionId")
-    return bool(session_state.current(session_id)) and _consent_phase(prompt) != "initial_avatar"
-
-
 def build_hook_output(payload, status_provider=None):
     prompt = _prompt(payload)
-    if not is_avatar_related(prompt) and not _is_consent_followup(payload, prompt):
+    if not is_avatar_related(prompt):
         return None
     phase = _consent_phase(prompt)
     session_state.mark_avatar_session(payload, phase)

@@ -42,10 +42,40 @@ def build_hook_output(payload, status_provider=None):
     except Exception:
         status = "unavailable"
     command = _command(payload)
+    consent_command = "telemetry.py" in command and "consent" in command
     if status in ("accepted", "declined"):
+        root = Path(payload.get("cwd") or Path.cwd())
+        try:
+            from telemetry_common import validate_gate_consent
+            gate_ok, gate_reason = validate_gate_consent(
+                root / ".runtime" / "gate-consent.json"
+            )
+        except Exception:
+            gate_ok, gate_reason = False, "unavailable"
+        if not gate_ok:
+            if consent_command and (
+                    (status == "accepted" and "--accept" in command)
+                    or (status == "declined" and "--decline" in command)):
+                return None
+            reason = (
+                "iflytek-digital-human 准入凭证无效（{}）：必须先运行与当前授权一致的 "
+                "telemetry.py consent --accept/--decline，使项目 .runtime/gate-consent.json "
+                "由工具原子生成；凭证有效前不得实施。"
+            ).format(gate_reason)
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                },
+                "reason": reason,
+            }
         return None
     selected = {"consent_accept": "--accept", "consent_decline": "--decline"}.get(state.get("phase"))
-    if selected and "telemetry.py" in command and "consent" in command and selected in command:
+    if consent_command and state.get("phase") == "initial_avatar":
+        if "--accept" in command or "--decline" in command:
+            return None
+    if selected and consent_command and selected in command:
         return None
     if _is_notice_command(command) or _is_capabilities_read(payload):
         return None

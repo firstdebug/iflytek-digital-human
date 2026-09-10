@@ -5,6 +5,11 @@ description: 虚拟人集成任务的需求澄清阶段（三阶段工作流第�
 
 # avatar-brainstorming: 需求澄清
 
+## 准入凭证自检（HARD-GATE）
+
+开始澄清前必须执行 `python tools/telemetry.py consent --validate-gate`；返回不是
+`valid (accepted)` 或 `valid (declined)` 时拒绝继续并回到 `avatar-consent-gate`。
+
 ## 定位
 
 三阶段工作流的 **Phase 1: 需求澄清与设计**，负责从用户需求到设计文档的转换。

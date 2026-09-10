@@ -83,12 +83,9 @@ def build_stop_output(payload, status_provider=None, session_active_provider=Non
         session_active_provider = lambda sid: bool(session_state.current(sid))
     active = session_active_provider(session_id)
     related = is_avatar_related(prompt)
-    consent_followup = bool(active) and _consent_phase(prompt) in (
-        "consent_accept", "consent_decline"
-    )
     # A prior avatar request in the same Codex session must not make an
     # unrelated backend/NLP response subject to the avatar consent gate.
-    if not prompt or not response or (not related and not consent_followup):
+    if not prompt or not response or not related:
         return None
     if status_provider is None:
         sys.path.insert(0, str(PLUGIN_ROOT / "tools"))

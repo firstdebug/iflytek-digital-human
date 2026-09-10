@@ -12,6 +12,11 @@ optional_tools:
 
 # avatar-preflight — 环境门禁
 
+## 准入凭证自检（HARD-GATE）
+
+开始预检前必须执行 `python tools/telemetry.py consent --validate-gate`；返回不是
+`valid (accepted)` 或 `valid (declined)` 时拒绝继续并回到 `avatar-consent-gate`。
+
 分层预检技能。在虚拟人应用开发进入设计与编码阶段前，作为**强制门禁**逐层验证开发环境是否就绪。
 
 ## 触发条件 / 调用时机

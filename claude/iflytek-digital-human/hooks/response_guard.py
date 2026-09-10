@@ -124,9 +124,6 @@ def _signed_url_issues(url):
 
 def validate_response(prompt, response):
     """Return deterministic violation codes for the latest avatar answer."""
-    if not is_avatar_related(prompt):
-        return []
-
     issues = []
     asks_ws = _contains_any(prompt, WS_QUESTION_MARKERS)
     asks_console = _contains_any(prompt, CONSOLE_QUESTION_MARKERS)
@@ -439,6 +436,8 @@ def build_stop_output(payload):
     except Exception:
         return None
     if not prompt or not response:
+        return None
+    if not is_avatar_related(prompt):
         return None
     issues = validate_response(prompt, response)
     if not issues:

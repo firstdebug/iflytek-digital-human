@@ -159,12 +159,10 @@ Xcode Build Settings:
 // 1. 创建 AvatarPlatform 实例
 const avatar = new AvatarPlatform();
 
-// 2. 设置接口信息
+// 2. 设置接口信息（前端只接收服务端签发的 signedUrl）
 avatar.setApiInfo({
-  serverUrl: 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact',
+  signedUrl: await fetch('/api/avatar-auth').then(r => r.json()).then(x => x.signedUrl),
   appId: 'your_app_id',
-  apiKey: 'your_api_key',
-  apiSecret: 'your_api_secret',
   sceneId: 'your_scene_id'
 });
 

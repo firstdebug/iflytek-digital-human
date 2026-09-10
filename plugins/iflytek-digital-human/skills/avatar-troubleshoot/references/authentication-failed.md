@@ -27,38 +27,40 @@ SDK 加载失败: avatar authentication failed
 
 ---
 
-### 2. apiSecret 错误
+### 2. 服务端签名 URL / apiSecret 错误
 
-**症状**: apiSecret 复制错了或被修改
+**症状**: WebSocket 已建立但立即返回 `avatar authentication failed`，或服务端生成的 signed URL 被浏览器复用/篡改。
 
 **检查**:
 ```bash
-# 查看 .env 中的 apiSecret
-cat .env | grep API_SECRET
-
-# 对比控制台里的值(注意只显示一次)
+python tools/xfyun_query_services.py list-apps
+python tools/xfyun_query_services.py list-scenes
+python tools/xfyun_model_manage.py check <sceneId>
 ```
 
 **修复**: 
-- apiSecret 只在创建时显示一次
-- 如果丢失，需要在控制台重新生成(会使旧值失效)
+- Web 端不得暴露 apiSecret；只允许后端用 apiSecret 生成一次性的 signed URL。
+- signed URL 只允许带 `authorization/date/host` 这类签名参数，不得把原始密钥下发到前端。
+- 如果 apiSecret 丢失或被重置，需要重新生成并更新服务端环境变量，然后重新生成 signed URL。
 
 ---
 
-### 3. appId 或 apiKey 错误
+### 3. appId / apiKey / sceneId 不匹配
 
-**症状**: appId/apiKey 复制错误或用错了项目的
+**症状**: appId、apiKey、sceneId 分别来自不同项目，或 sceneId 不是接口服务项目。
 
 **检查**:
-```javascript
-// 浏览器控制台打印实际使用的凭据
-console.log('appId:', import.meta.env.VITE_AVATAR_APP_ID);
-console.log('apiKey:', import.meta.env.VITE_AVATAR_API_KEY);
-
-// 对比控制台 "我的接口项目" → "编辑" 里显示的值
+```bash
+python tools/xfyun_query_services.py list-apps
+python tools/xfyun_query_services.py list-scenes
 ```
 
-**修复**: 从控制台重新复制正确的值到 `.env`
+**修复**: 使用同一个接口服务项目下的 appId、apiKey、sceneId；如项目不存在或类型不对，重新创建接口服务：
+
+```bash
+python tools/xfyun_interface.py create <appId> <name>
+python tools/xfyun_interface.py auth-avatar <appId>
+```
 
 ---
 
@@ -95,22 +97,22 @@ this.avatar.setApiInfo({
 
 ## 诊断步骤
 
-```javascript
-// 1. 打印所有凭据(脱敏 apiSecret)
-const config = {
-    appId: import.meta.env.VITE_AVATAR_APP_ID,
-    apiKey: import.meta.env.VITE_AVATAR_API_KEY,
-    apiSecret: import.meta.env.VITE_AVATAR_API_SECRET?.slice(0, 8) + '****',
-    sceneId: import.meta.env.VITE_AVATAR_SCENE_ID,
-};
-console.log('🔑 当前凭据:', config);
+```bash
+# 1. 查询账号下应用，确认 appId/appType
+python tools/xfyun_query_services.py list-apps
 
-// 2. 在控制台对比
-// 访问: https://virtual-man.xfyun.cn/console/projects
-// 接口服务 → 我的接口项目 → 编辑 → 查看凭据
+# 2. 查询接口场景，确认 sceneId 属于当前 appId 且已发布
+python tools/xfyun_query_services.py list-scenes
 
-// 3. 检查 sceneId 发布状态
-// 必须显示 "已发布"，否则无法使用
+# 3. 检查模型/NLP 绑定是否正常
+python tools/xfyun_model_manage.py check <sceneId>
+
+# 4. 必要时重新创建接口项目并授权形象/发音人
+python tools/xfyun_interface.py create <appId> <name>
+python tools/xfyun_interface.py auth-avatar <appId>
+
+# 5. 浏览器自动采集运行证据，只有 ready_to_deliver=true 才能完成交付
+python tools/web_delivery.py
 ```
 
 ---
@@ -120,11 +122,11 @@ console.log('🔑 当前凭据:', config);
 - [ ] sceneId 已点击"发布"？
 - [ ] 接口服务状态显示"已发布"？
 - [ ] 免费时长是否还有剩余？(600分钟)
-- [ ] appId 是 8 位数字？
-- [ ] apiKey 是 32 位十六进制？
-- [ ] apiSecret 是 32 位十六进制？
+- [ ] appId / apiKey / sceneId 来自同一个接口服务项目？
+- [ ] apiSecret 只存在于服务端签名逻辑中，没有下发到浏览器？
 - [ ] sceneId 和 appId 来自同一个项目？
-- [ ] .env 文件中凭据前缀是 `VITE_AVATAR_` ？
+- [ ] `web_delivery.py` 已采集到 `connected`、`stream_start`、`first_frame` 等证据？
+- [ ] 交付证据中出现 `ready_to_deliver=true`？
 
 ---
 
@@ -140,10 +142,10 @@ console.log('🔑 当前凭据:', config);
 
 ### 如果是凭据错误:
 ```
-1. 对比控制台和 .env 中的值
-2. 重新复制正确的凭据到 .env
-3. 重启开发服务器(npm run dev)
-4. 刷新浏览器页面
+1. 用 xfyun_query_services.py list-apps / list-scenes 对齐 appId、apiKey、sceneId
+2. 服务端更新 apiSecret，并重新生成 signed URL
+3. 重启后端签名服务和前端开发服务器
+4. 重新运行 web_delivery.py，直到 ready_to_deliver=true
 ```
 
 ### 如果是时长耗尽:
@@ -155,37 +157,22 @@ console.log('🔑 当前凭据:', config);
 
 ---
 
-## 在线验证(avatar-credentials skill)
+## 在线验证
 
-可以用 `avatar-credentials` skill 的在线验证功能测试凭据:
+不要手写未证实的控制台 API，也不要在浏览器里打印密钥。按工具链验证：
 
-```javascript
-async function verifyCredentials(config) {
-    try {
-        const response = await fetch(
-            `https://virtual-man.xfyun.cn/api/v1/scene/${config.sceneId}/status`,
-            {
-                headers: {
-                    'X-App-Id': config.appId,
-                    'X-Api-Key': config.apiKey,
-                }
-            }
-        );
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('✅ 凭据验证通过');
-            console.log('场景状态:', data);
-            return true;
-        } else {
-            console.error('❌ 凭据验证失败:', response.status);
-            return false;
-        }
-    } catch (error) {
-        console.error('❌ 验证请求失败:', error);
-        return false;
-    }
-}
+```bash
+python tools/xfyun_query_services.py list-apps
+python tools/xfyun_query_services.py list-scenes
+python tools/xfyun_model_manage.py check <sceneId>
+python tools/web_delivery.py
+```
+
+如果缺接口项目或授权资产，先补齐：
+
+```bash
+python tools/xfyun_interface.py create <appId> <name>
+python tools/xfyun_interface.py auth-avatar <appId>
 ```
 
 ---

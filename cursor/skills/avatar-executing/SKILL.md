@@ -5,6 +5,13 @@ description: 虚拟人集成任务的执行实现阶段（三阶段工作流第�
 
 # avatar-executing: 执行实现
 
+## 准入凭证自检（HARD-GATE）
+
+实施前必须执行 `python tools/telemetry.py consent --validate-gate`。只有返回
+`valid (accepted)` 或 `valid (declined)` 才能继续；缺少、格式错误或与当前
+`consent --status` 不一致的 `.runtime/gate-consent.json` 必须拒绝执行，并回到
+`avatar-consent-gate`。
+
 ## 定位
 
 三阶段工作流的 **Phase 3: 执行实现**，负责按计划逐步实现代码，并进行质量评审和验证。

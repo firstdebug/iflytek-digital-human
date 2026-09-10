@@ -375,7 +375,7 @@ class ResponseGuardTests(unittest.TestCase):
             transcript = Path(temp_dir) / "other-session.jsonl"
             transcript.write_text(json.dumps({
                 "type": "user",
-                "message": {"role": "user", "content": "虚拟人 wsurl 是什么？"},
+                "message": {"role": "user", "content": "$iflytek-digital-human:avatar-workflow-entry 虚拟人 wsurl 是什么？"},
             }, ensure_ascii=False), encoding="utf-8")
             output = response_guard.build_stop_output({
                 "session_id": "current-session",
@@ -396,7 +396,7 @@ class ResponseGuardTests(unittest.TestCase):
 
     def test_stop_hook_reads_latest_exchange_and_blocks(self):
         records = [
-            {"type": "user", "message": {"role": "user", "content": "虚拟人 wsurl 是什么？"}},
+            {"type": "user", "message": {"role": "user", "content": "$iflytek-digital-human:avatar-workflow-entry 虚拟人 wsurl 是什么？"}},
             {
                 "type": "assistant",
                 "message": {
@@ -412,7 +412,7 @@ class ResponseGuardTests(unittest.TestCase):
                 encoding="utf-8",
             )
             output = response_guard.build_stop_output(
-                {"session_id": "session", "prompt": "虚拟人 wsurl 是什么？",
+                {"session_id": "session", "prompt": "$iflytek-digital-human:avatar-workflow-entry 虚拟人 wsurl 是什么？",
                  "transcript_path": str(transcript), "stop_hook_active": False}
             )
 
@@ -429,7 +429,7 @@ class ResponseGuardTests(unittest.TestCase):
             "session_id": "session",
             "stop_hook_active": False,
             "transcript_path": "ignored.jsonl",
-            "prompt": "讯飞虚拟人的 signedUrl 如何使用？",
+            "prompt": "$iflytek-digital-human:avatar-workflow-entry 讯飞虚拟人的 signedUrl 如何使用？",
             "last_assistant_message": "signedUrl 用 wss://avatar.xfyun.cn/wrong。",
         }
         with mock.patch.object(
@@ -444,7 +444,7 @@ class ResponseGuardTests(unittest.TestCase):
                 "type": "user",
                 "message": {
                     "role": "user",
-                    "content": "这是讯飞虚拟人问题。请给我一个错误 wsurl 和错误控制台地址作为示例。",
+                    "content": "$iflytek-digital-human:avatar-workflow-entry 这是讯飞虚拟人问题。请给我一个错误 wsurl 和错误控制台地址作为示例。",
                 },
             },
             {
@@ -488,7 +488,7 @@ class ResponseGuardTests(unittest.TestCase):
             )
             prompt, response = response_guard.latest_exchange(str(transcript))
             output = response_guard.build_stop_output(
-                {"session_id": "session", "prompt": "讯飞虚拟人问题",
+                {"session_id": "session", "prompt": "$iflytek-digital-human:avatar-workflow-entry 讯飞虚拟人问题",
                  "transcript_path": str(transcript), "stop_hook_active": False}
             )
 
@@ -503,7 +503,7 @@ class ResponseGuardTests(unittest.TestCase):
                 "type": "user",
                 "message": {
                     "role": "user",
-                    "content": "讯飞虚拟人的 signedUrl 如何使用？",
+                    "content": "$iflytek-digital-human:avatar-workflow-entry 讯飞虚拟人的 signedUrl 如何使用？",
                 },
             },
             {
@@ -545,7 +545,7 @@ class ResponseGuardTests(unittest.TestCase):
             )
             prompt, response = response_guard.latest_exchange(str(transcript))
             output = response_guard.build_stop_output(
-                {"session_id": "session", "prompt": "讯飞虚拟人问题",
+                {"session_id": "session", "prompt": "$iflytek-digital-human:avatar-workflow-entry 讯飞虚拟人问题",
                  "transcript_path": str(transcript), "stop_hook_active": False}
             )
 

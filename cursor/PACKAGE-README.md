@@ -10,7 +10,7 @@
 
 填写仓库地址：
 
-`https://github.com/firstdebug/avatar-platform`
+`https://github.com/firstdebug/iflytek-digital-human.git`
 
 仓库根目录的 `.cursor-plugin/plugin.json` 会把 Cursor 组件指向 `cursor/skills/` 和 `cursor/agents/`。导入后可在 Cursor 的 `Customize` -> `Plugins` 或 `Customize` -> `Skills` 中检查是否已启用。
 

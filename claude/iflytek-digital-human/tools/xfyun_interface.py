@@ -52,6 +52,7 @@ if sys.platform == "win32":
 
 import json
 import xfyun_common as xc
+from platform_endpoints import CANONICAL_WS_URL
 
 # ==================== API 端点 ====================
 API_APP_QUERY = "https://virtual-man.xfyun.cn/zs_web/app/query"
@@ -74,7 +75,7 @@ CANDIDATE_ANCHORS = ["118801001", "110117026", "110026010", "118801002"]
 CANDIDATE_VCNS = ["x4_lingxiaoqi_oral", "x4_yezi", "x4_mingge", "x4_yiting"]
 
 # SDK/WebAPI 生产接入地址（三端一致；不设会走 AAR 内置测试地址导致 600003）
-SERVER_URL = "wss://avatar.cn-huadong-1.xf-yun.com/v1/interact"
+SERVER_URL = CANONICAL_WS_URL
 
 # 场景类型：接口（SDK/WebAPI）对话
 SCENE_TYPE_INTERFACE = 1

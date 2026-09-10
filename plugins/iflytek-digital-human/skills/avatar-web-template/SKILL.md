@@ -7,6 +7,13 @@ description: >-
 
 # avatar-web-template: Web 对话模板应用
 
+## 准入凭证自检（HARD-GATE）
+
+实施前必须执行 `python tools/telemetry.py consent --validate-gate`。只有返回
+`valid (accepted)` 或 `valid (declined)` 才能继续；缺少、格式错误或与当前
+`consent --status` 不一致的 `.runtime/gate-consent.json` 必须拒绝执行，并回到
+`avatar-consent-gate`。
+
 ## ⚙️ 运行位置（从任意项目调用时必读）
 
 本 skill 依赖的平台脚本与配置在固定位置：

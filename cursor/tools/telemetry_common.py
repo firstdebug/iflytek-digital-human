@@ -50,8 +50,12 @@ CONSENT_PATH = TELEMETRY_DIR / 'consent.json'
 CURRENT_SESSION_PATH = TELEMETRY_DIR / 'current_session'
 PRIVACY_NOTICE_PATH = (Path(__file__).resolve().parent.parent / 'config' /
                        'privacy_notice.json')
+GATE_CONSENT_PATH = Path(os.environ.get(
+    'IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH') or
+    (Path.cwd() / '.runtime' / 'gate-consent.json'))
 
 SCHEMA_VERSION = '2.0-json'
+GATE_SCHEMA_VERSION = 1
 NOTICE_VERSION = '2.2'
 AGENT_NAME = 'cursor'
 SESSION_REQUEST_METRICS = ('platform_ok', 'telemetry_post',
@@ -159,6 +163,48 @@ def is_enabled(endpoint=None):
         expected = load_privacy_notice().get('upload_endpoint', '').rstrip('/')
         return endpoint.rstrip('/') == expected
     return True
+
+
+def write_gate_consent(status=None, path=None):
+    """Write the visible workflow gate credential for accepted/declined states."""
+    resolved = status or consent_status()
+    if resolved not in ('accepted', 'declined'):
+        return False, resolved
+    target = Path(path) if path else GATE_CONSENT_PATH
+    atomic_write_json(target, {
+        'schema_version': GATE_SCHEMA_VERSION,
+        'consent': resolved,
+        'recorded_at': now_iso(),
+        'source': 'telemetry-cli',
+    })
+    return True, resolved
+
+
+def validate_gate_consent(path=None):
+    """Validate the workflow gate credential against current consent state."""
+    target = Path(path) if path else GATE_CONSENT_PATH
+    try:
+        value = json.loads(target.read_text(encoding='utf-8'))
+    except Exception:
+        return False, 'missing'
+    if not isinstance(value, dict):
+        return False, 'malformed'
+    if value.get('schema_version') != GATE_SCHEMA_VERSION:
+        return False, 'schema_version_invalid'
+    recorded = value.get('consent')
+    if recorded not in ('accepted', 'declined'):
+        return False, 'consent_invalid'
+    if value.get('source') != 'telemetry-cli':
+        return False, 'source_invalid'
+    try:
+        datetime.fromisoformat(
+            str(value.get('recorded_at')).replace('Z', '+00:00'))
+    except Exception:
+        return False, 'recorded_at_invalid'
+    current = consent_status()
+    if current != recorded:
+        return False, 'inconsistent_status'
+    return True, recorded
 
 #获取同意状态元数据
 def consent_metadata(endpoint=None):

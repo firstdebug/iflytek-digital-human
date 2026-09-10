@@ -65,12 +65,10 @@ import AvatarPlatform, { SDKEvents, PlayerEvents } from './sdk/avatar-sdk-web_3.
 // 1. 创建实例
 const avatar = new AvatarPlatform();
 
-// 2. 配置凭据
+// 2. 配置服务端签发的连接信息（apiKey/apiSecret 不进入前端）
 avatar.setApiInfo({
-  serverUrl: 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact',
+  signedUrl: await fetch('/api/avatar-auth').then(r => r.json()).then(x => x.signedUrl),
   appId: 'your_app_id',
-  apiKey: 'your_api_key',
-  apiSecret: 'your_api_secret',
   sceneId: 'your_scene_id'
 });
 
@@ -249,10 +247,7 @@ server {
 // ❌ 错误: 明文暴露
 const apiSecret = 'your_api_secret';
 
-// ✓ 正确: 从环境变量或后端获取
-const apiSecret = import.meta.env.VITE_AVATAR_API_SECRET;
-
-// ✓ 更好: 后端签名，前端只传 signedUrl
+// ✓ 正确: 后端签名，前端只传 signedUrl
 avatar.setApiInfo({
   appId: 'xxx',
   sceneId: 'xxx',

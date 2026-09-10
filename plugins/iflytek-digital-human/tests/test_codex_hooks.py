@@ -26,6 +26,42 @@ def load_hook_module(name):
 
 
 class CodexHookPackageTests(unittest.TestCase):
+    def test_explicit_intent_ignores_natural_language_history_and_code(self):
+        intent = load_hook_module("avatar_intent")
+        self.assertFalse(intent.is_avatar_related("创建一个虚拟人项目"))
+        self.assertFalse(intent.is_avatar_related(
+            "上一轮：$iflytek-digital-human:avatar-workflow-entry"))
+        self.assertFalse(intent.is_avatar_related(
+            "```text\n$iflytek-digital-human:avatar-workflow-entry\n```"))
+        self.assertTrue(intent.is_avatar_related(
+            "$iflytek-digital-human:avatar-workflow-entry 创建项目"))
+        self.assertTrue(intent.is_avatar_related(
+            "$avatar-workflow-entry 创建项目"))
+        self.assertTrue(intent.is_avatar_related(
+            "/iflytek-digital-human:avatar-workflow-entry 创建项目"))
+        self.assertTrue(intent.is_avatar_related(
+            "/avatar-workflow-entry 创建项目"))
+
+    def test_gate_credential_validates_status_and_rejects_tampering(self):
+        path = PLUGIN_ROOT / "tools" / "telemetry_common.py"
+        spec = importlib.util.spec_from_file_location("codex_gate_common", path)
+        common = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(common)
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "gate-consent.json"
+            with mock.patch.object(common, "consent_status", return_value="declined"):
+                ok, reason = common.write_gate_consent("declined", target)
+                self.assertTrue(ok)
+                self.assertEqual(reason, "declined")
+                self.assertEqual(common.validate_gate_consent(target), (True, "declined"))
+                value = json.loads(target.read_text(encoding="utf-8"))
+                value["consent"] = "accepted"
+                target.write_text(json.dumps(value), encoding="utf-8")
+                self.assertEqual(
+                    common.validate_gate_consent(target),
+                    (False, "inconsistent_status"),
+                )
+
     def test_manifest_registers_codex_hooks(self):
         manifest = json.loads(
             (PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(
@@ -53,7 +89,7 @@ class CodexHookPackageTests(unittest.TestCase):
                     self.assertIs(handler["async"], False)
                     self.assertNotIn("timeoutSec", handler)
 
-    def test_route_hint_matches_strong_avatar_intent_only(self):
+    def test_route_hint_requires_explicit_avatar_invocation(self):
         route = load_hook_module("route_hint")
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
@@ -61,12 +97,20 @@ class CodexHookPackageTests(unittest.TestCase):
                     {"session_id": "s1", "prompt": "帮我修一下普通网页"},
                     status_provider=lambda: "undecided",
                 )
-                avatar = route.build_hook_output(
+                natural_avatar = route.build_hook_output(
                     {"session_id": "s2", "prompt": "创建一个讯飞虚拟人项目"},
                     status_provider=lambda: "undecided",
                 )
+                explicit = route.build_hook_output(
+                    {
+                        "session_id": "s3",
+                        "prompt": "$iflytek-digital-human:avatar-workflow-entry 创建一个讯飞虚拟人项目",
+                    },
+                    status_provider=lambda: "undecided",
+                )
         self.assertIsNone(unrelated)
-        context = avatar["hookSpecificOutput"]["additionalContext"]
+        self.assertIsNone(natural_avatar)
+        context = explicit["hookSpecificOutput"]["additionalContext"]
         self.assertIn("avatar-workflow-entry", context)
         self.assertIn("助手对话正文", context)
         self.assertIn("完整能力清单", context)
@@ -95,11 +139,27 @@ class CodexHookPackageTests(unittest.TestCase):
                 output = route.build_hook_output(
                     {
                         "session_id": "s1",
-                        "prompt": "$iflytek-digital-human:avatar-workflow-entry",
+                        "prompt": "$avatar-workflow-entry",
                     },
                     status_provider=lambda: "undecided",
                 )
         self.assertIsNotNone(output)
+
+    def test_route_hint_ignores_invocation_inside_fence_or_quote(self):
+        route = load_hook_module("route_hint")
+        prompts = (
+            "```text\n$iflytek-digital-human:avatar-workflow-entry\n```",
+            "> $iflytek-digital-human:avatar-workflow-entry",
+            "上一轮：$iflytek-digital-human:avatar-workflow-entry",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
+                for prompt in prompts:
+                    output = route.build_hook_output(
+                        {"session_id": "quoted", "prompt": prompt},
+                        status_provider=lambda: "undecided",
+                    )
+                    self.assertIsNone(output)
 
     def test_explicit_skill_invocation_wins_over_backend_markers(self):
         intent = load_hook_module("avatar_intent")
@@ -114,7 +174,11 @@ class CodexHookPackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
                 route.build_hook_output(
-                    {"session_id": "s1", "cwd": tmp, "prompt": "创建虚拟人项目"},
+                    {
+                        "session_id": "s1",
+                        "cwd": tmp,
+                        "prompt": "$iflytek-digital-human:avatar-workflow-entry 创建虚拟人项目",
+                    },
                     status_provider=lambda: "undecided",
                 )
                 output = route.build_hook_output(
@@ -122,8 +186,8 @@ class CodexHookPackageTests(unittest.TestCase):
                     status_provider=lambda: "undecided",
                 )
                 state = route.session_state.current("s1")
-        self.assertEqual(state["phase"], "consent_accept")
-        self.assertIn("consent --accept", output["systemMessage"])
+        self.assertEqual(state["phase"], "initial_avatar")
+        self.assertIsNone(output)
 
     def test_pre_tool_guard_blocks_work_before_consent(self):
         guard = load_hook_module("pre_tool_guard")
@@ -183,9 +247,7 @@ class CodexHookPackageTests(unittest.TestCase):
                 allowed = guard.build_hook_output(
                     payload, status_provider=lambda: "undecided"
                 )
-        self.assertEqual(
-            denied["hookSpecificOutput"]["permissionDecision"], "deny"
-        )
+        self.assertIsNone(denied)
         self.assertIsNone(allowed)
 
     def test_pre_tool_guard_allows_only_the_selected_consent_mutation(self):
@@ -227,7 +289,7 @@ class CodexHookPackageTests(unittest.TestCase):
         notice = response_guard.render_privacy_notice().strip()
         payload = {
             "session_id": "s1",
-            "prompt": "创建讯飞虚拟人项目",
+            "prompt": "$iflytek-digital-human:avatar-workflow-entry 创建讯飞虚拟人项目",
             "last_assistant_message": "请问是否同意？",
         }
         missing = response_guard.build_stop_output(
@@ -265,8 +327,7 @@ class CodexHookPackageTests(unittest.TestCase):
                     },
                     status_provider=lambda: "undecided",
                 )
-        self.assertEqual(output["decision"], "block")
-        self.assertIn("consent --accept", output["reason"])
+        self.assertIsNone(output)
 
     def test_stop_guard_ignores_unrelated_backend_prompt_in_old_avatar_session(self):
         response_guard = load_hook_module("response_guard")
@@ -325,7 +386,7 @@ class CodexHookPackageTests(unittest.TestCase):
         payload = json.dumps(
             {
                 "session_id": "utf8-pipe",
-                "prompt": "创建一个讯飞虚拟人项目",
+                "prompt": "$iflytek-digital-human:avatar-workflow-entry 创建一个讯飞虚拟人项目",
                 "cwd": str(PLUGIN_ROOT),
             },
             ensure_ascii=False,

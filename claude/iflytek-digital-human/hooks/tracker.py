@@ -11,7 +11,7 @@ import os
 import re
 import sys
 
-from avatar_intent import is_avatar_related
+from avatar_intent import explicit_avatar_commands
 
 _TM_DIR = os.path.join(os.path.expanduser('~'), '.claude', 'iflytek-digital-human',
                        'telemetry')
@@ -41,7 +41,6 @@ SKILL_RESOURCE_RE = re.compile(
     r'(?:skill\.md|(?:references|scripts|templates|assets)[/\\].+)$', re.I)
 CURRENT_PLUGIN_ROOT = os.path.normcase(os.path.realpath(
     os.path.join(os.path.dirname(__file__), os.pardir)))
-SLASH_RE = re.compile(r'/iflytek-digital-human:([a-z0-9][a-z0-9-]*)', re.I)
 PATHY_RE = re.compile(
     r'[A-Za-z]:[\\/][^\s"\']*|~?/[^\s"\']{3,}|https?://\S+|`[^`]*`', re.I)
 
@@ -384,22 +383,16 @@ def reconcile_stale(state, current_workflow_id):
 
 def handle_prompt(state, payload, workflow_id, session_id=None):
     prompt = payload.get('prompt') or payload.get('user_prompt') or ''
-    slashes = SLASH_RE.findall(prompt)
-    if slashes:
+    skills = explicit_avatar_commands(prompt)
+    if skills:
         workflow_id = ensure_workflow(
             state, workflow_id, signal=True, cwd=payload.get('cwd'),
             session_id=session_id) or workflow_id
-        for skill in slashes:
+        for skill in skills:
             skill = skill.lower()
             workflow_id = route_workflow_for_skill(
                 state, workflow_id, session_id, skill, cwd=payload.get('cwd'))
             record_invocation(state, workflow_id, skill, source='slash')
-    else:
-        cleaned = PATHY_RE.sub(' ', prompt)
-        if is_avatar_related(cleaned):
-            workflow_id = ensure_workflow(
-                state, workflow_id, signal=True, cwd=payload.get('cwd'),
-                session_id=session_id) or workflow_id
     item = _workflow(state, workflow_id)
     if item:
         from telemetry_common import set_active_workflow

@@ -1,6 +1,6 @@
 # 迁移到 Codex / Cursor 说明
 
-本目录是 iflytek-digital-human 的 Codex 适配包；Claude Code、Cursor 和 Codex 使用各自的安装目录。若从 Claude Code 源包重新生成适配包，除了执行格式转换命令外，还需处理几处平台差异。本文档说明完整步骤与已知降级项。
+本目录是 iflytek-digital-human 的 Codex 适配包；本仓库同时包含 Claude Code、Cursor / Codex 适配包，三者使用各自的安装目录。若从 Claude Code 源包重新生成适配包，除了执行格式转换命令外，还需处理几处平台差异。本文档说明完整步骤与已知降级项。
 
 ## 一、转换命令
 
@@ -31,7 +31,9 @@ Codex / Cursor 的运行环境不保证有 Python3 或这些库。若目标环�
 
 ### 2. Hooks 接入边界
 
-Claude Code 源包的 `hooks/hooks.json` 注册了 `UserPromptSubmit` 钩子：每次用户发消息时运行 `hooks/route_hint.py`，检测“虚拟人/数字人”等关键词，自动把请求导向入口 Skill `avatar-workflow-entry`，并把本地授权状态注入上下文。
+Claude Code 的 Hook 机制与 Codex 的 Hook 机制均只对当前消息中的显式 skill 调用启用；自然语言、引用历史、代码块和普通后端 NLP 调试不会触发隐私门禁。
+
+Claude Code 源包的 `hooks/hooks.json` 注册了 `UserPromptSubmit` 钩子：当前消息显式调用 `/iflytek-digital-human:<skill>` 或 `$iflytek-digital-human:<skill>` 时运行 `hooks/route_hint.py`，把本地授权状态注入上下文。
 
 Claude Code 与当前稳定版 Codex 都支持这组生命周期事件。Codex 包通过根目录 `hooks.json` 注册 `UserPromptSubmit`、`PreToolUse`、`PostToolUse`、`Stop` 和 `SessionEnd`；命令处理器使用 `commandWindows`、`timeout`、同步 `async: false` 和 Codex 的 `hookSpecificOutput`。`hooks/list` 返回的运行时元数据会把超时显示为 `timeoutSec`，不要反向写进配置文件。Cursor 仍不假设提供同等生命周期，因此入口 Skill 保留显式门禁作为兼容路径：
 

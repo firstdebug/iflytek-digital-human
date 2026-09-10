@@ -14,7 +14,7 @@
   "author": "firstdebug",
   "repository": {
     "type": "git",
-    "url": "https://github.com/firstdebug/avatar-platform.git",
+    "url": "https://github.com/firstdebug/iflytek-digital-human.git",
     "directory": "plugins/iflytek-digital-human"
   },
   "config": {

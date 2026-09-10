@@ -43,6 +43,9 @@ class PlatformPackageTests(unittest.TestCase):
         env = os.environ.copy()
         env["CURSOR_HOME" if platform == "cursor" else "CODEX_HOME"] = str(home)
         env["XFYUN_AVATAR_COOKIE_FILE"] = str(home / "missing-cookie.json")
+        env["IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH"] = str(
+            home / "gate-consent.json"
+        )
         return subprocess.run(
             [sys.executable, str(root / "tools" / "telemetry.py"), *args],
             cwd=str(root), env=env, check=True, text=True,
@@ -68,6 +71,7 @@ class PlatformPackageTests(unittest.TestCase):
                 "tools/web_delivery.py",
                 "tools/platform_endpoints.py",
                 "skills/avatar-workflow-entry/SKILL.md",
+                "skills/avatar-consent-gate/SKILL.md",
             ):
                 self.assertTrue((root / relative).is_file(), f"{platform}: {relative}")
 
@@ -116,8 +120,8 @@ class PlatformPackageTests(unittest.TestCase):
         tracker = (CLAUDE_PACKAGE / "hooks" / "tracker.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("/" + PLUGIN_NAME + ":", intent)
-        self.assertIn("/" + PLUGIN_NAME + ":", tracker)
+        self.assertIn(PLUGIN_NAME, intent)
+        self.assertIn(PLUGIN_NAME, tracker)
 
     def test_skill_frontmatter_matches_directory(self):
         for platform, root in PACKAGES.items():
@@ -240,6 +244,45 @@ class PlatformPackageTests(unittest.TestCase):
                     "status": "skipped", "reason": "disabled"})
                 self.assertFalse(
                     (home / PLUGIN_NAME / "telemetry" / "state.json").exists())
+
+    def test_consent_creates_and_validates_gate_credential(self):
+        for platform in PACKAGES:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                home = Path(temp)
+                self.run_telemetry(platform, home, "consent", "--decline")
+                gate = home / "gate-consent.json"
+                value = json.loads(gate.read_text(encoding="utf-8"))
+                self.assertEqual(value["schema_version"], 1)
+                self.assertEqual(value["consent"], "declined")
+                self.assertEqual(value["source"], "telemetry-cli")
+                self.assertIn("recorded_at", value)
+                self.assertEqual(
+                    self.run_telemetry(platform, home, "consent", "--validate-gate"),
+                    "valid (declined)",
+                )
+                value["consent"] = "accepted"
+                gate.write_text(json.dumps(value), encoding="utf-8")
+                self.assertEqual(
+                    self.run_telemetry(platform, home, "consent", "--validate-gate"),
+                    "invalid (inconsistent_status)",
+                )
+
+    def test_consent_status_does_not_bypass_missing_gate(self):
+        for platform in PACKAGES:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                home = Path(temp)
+                self.run_telemetry(platform, home, "consent", "--accept")
+                gate = home / "gate-consent.json"
+                gate.unlink()
+                self.assertEqual(
+                    self.run_telemetry(platform, home, "consent", "--status"),
+                    "accepted",
+                )
+                self.assertFalse(gate.is_file())
+                self.assertEqual(
+                    self.run_telemetry(platform, home, "consent", "--validate-gate"),
+                    "invalid (missing)",
+                )
 
     def test_explicit_lifecycle_records_and_deduplicates_skills(self):
         for platform in PACKAGES:

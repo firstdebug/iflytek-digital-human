@@ -46,9 +46,14 @@ python tools\xfyun_query_services.py
 Install the GitHub marketplace and plugin with:
 
 ```powershell
-codex plugin marketplace add firstdebug/avatar-platform --ref main
+codex plugin marketplace add firstdebug/iflytek-digital-human --ref main
 codex plugin add iflytek-digital-human@iflytek-digital-human-codex
 ```
+
+首次执行虚拟人 Skill 时，先完成独立的 `avatar-consent-gate`。授权选择由
+`tools/telemetry.py consent --accept/--decline --project <项目目录>` 写入当前项目的
+`.runtime/gate-consent.json`；后续实施前用
+`tools/telemetry.py consent --validate-gate --project <项目目录>` 自检。
 
 ## Runtime Dependencies
 

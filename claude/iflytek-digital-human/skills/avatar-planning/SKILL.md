@@ -9,6 +9,11 @@ priority: high
 
 # avatar-planning: 计划生成
 
+## 准入凭证自检（HARD-GATE）
+
+开始计划前必须执行 `python tools/telemetry.py consent --validate-gate`；返回不是
+`valid (accepted)` 或 `valid (declined)` 时拒绝继续并回到 `avatar-consent-gate`。
+
 ## 定位
 
 三阶段工作流的 **Phase 2: 计划生成**，负责将设计文档转化为可执行的实现步骤。

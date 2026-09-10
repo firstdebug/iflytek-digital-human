@@ -243,15 +243,14 @@ class TrackerStateMachineTests(unittest.TestCase):
         self.assertNotIn("hit_count", item)
         self.assertEqual(item["source"], "read")
 
-    def test_prompt_text_is_not_stored_in_workflow(self):
+    def test_natural_avatar_prompt_does_not_create_workflow(self):
         payload = {
             "session_id": "session",
             "cwd": "C:/project",
             "prompt": "做虚拟人 apiKey=secret C:\\Users\\name\\private",
         }
         tracker.handle_prompt(self.state, payload, "wf-session", "session")
-        item = self.state["workflows"][0]
-        self.assertNotIn("first_prompt", item)
+        self.assertEqual(self.state["workflows"], [])
 
     def test_weak_avatar_word_does_not_create_workflow(self):
         payload = {

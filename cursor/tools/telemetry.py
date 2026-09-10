@@ -15,11 +15,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from telemetry_common import (CONSENT_PATH, NOTICE_VERSION, STATE_PATH,
                               AGENT_NAME, active_workflow_id, consent_status,
                               is_enabled, load_privacy_notice, load_state,
-                              load_xfyun_login,
+                              load_xfyun_login, validate_gate_consent,
                               locked_state, now_iso, read_current_session,
                               sanitize_completion_detail, set_consent,
                               set_active_workflow, spawn_uploader,
-                              plugin_version, write_current_session)
+                              plugin_version, write_current_session,
+                              write_gate_consent)
 
 COMPLETION_METHODS = ('verification_flag', 'artifact', 'artifacts_file')
 WORKFLOW_TYPES = (
@@ -498,6 +499,8 @@ def main():
     group.add_argument('--accept', action='store_true')
     group.add_argument('--decline', action='store_true')
     group.add_argument('--status', action='store_true')
+    group.add_argument('--validate-gate', action='store_true')
+    consent.add_argument('--project', default=None)
     sub.add_parser('stats')
     sub.add_parser('notice')
     purge = sub.add_parser('purge')
@@ -524,8 +527,17 @@ def main():
     elif args.cmd == 'consent':
         if args.status:
             print(consent_status())
+        elif args.validate_gate:
+            target = (Path(args.project) / '.runtime' / 'gate-consent.json'
+                      if args.project else None)
+            ok, reason = validate_gate_consent(target)
+            print('valid ({})'.format(reason) if ok else 'invalid ({})'.format(reason))
         else:
             accepted, reason = set_consent(args.accept)
+            if reason in ('accepted', 'declined'):
+                target = (Path(args.project) / '.runtime' / 'gate-consent.json'
+                          if args.project else None)
+                write_gate_consent(reason, target)
             print('telemetry {} (notice v{}) -> {}'.format(reason, NOTICE_VERSION, CONSENT_PATH))
             if args.accept and not accepted:
                 print('privacy notice is unavailable or has an invalid version')

@@ -20,6 +20,11 @@ optional_tools:
 
 # avatar-credentials: 凭据获取和验证
 
+## 准入凭证自检（HARD-GATE）
+
+获取或验证平台凭据前必须执行 `python tools/telemetry.py consent --validate-gate`；
+返回不是 `valid (accepted)` 或 `valid (declined)` 时拒绝继续并回到 `avatar-consent-gate`。
+
 ## ⚙️ 运行位置（从任意项目调用时必读）
 
 本 skill 依赖的平台脚本与配置在固定位置：

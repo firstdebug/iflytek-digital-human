@@ -5,6 +5,11 @@ description: 项目交付前的完整验证流程。自动检测并修复常见�
 
 # avatar-verification: 交付前验证
 
+## 准入凭证自检（HARD-GATE）
+
+验证前必须执行 `python tools/telemetry.py consent --validate-gate`；返回不是
+`valid (accepted)` 或 `valid (declined)` 时拒绝继续并回到 `avatar-consent-gate`。
+
 ## 定位
 
 在项目交付给用户前，自动执行完整的验证流程，检测并修复常见问题，确保用户拿到的是**开箱即用**的项目。

@@ -11,6 +11,13 @@ description: >-
 
 # avatar-workflow-entry: 智能路由入口
 
+## 第一步：调用 `avatar-consent-gate`
+
+在读取本入口其余内容、扫描工程、询问 `quick/strict` 或意图识别前，必须先调用
+`avatar-consent-gate`。只有 `python tools/telemetry.py consent --validate-gate` 返回
+`valid (accepted)` 或 `valid (declined)`，才允许继续；缺少或无效的
+`.runtime/gate-consent.json` 必须立即回到该门禁。
+
 ## ⚙️ 技能库位置（路由前必读）
 
 本入口是 iflytek-digital-human 技能包的总入口。整个技能库在固定位置：
