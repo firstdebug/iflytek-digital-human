@@ -49,8 +49,8 @@ Cursor 当前推荐通过 Dashboard 导入 GitHub 插件仓库：
 
 ## 使用
 
-统一入口为 `avatar-workflow-entry`。也可以直接描述需求，例如：
-
+统一入口为 `avatar-workflow-entry`。例如：
+/avatar-workflow-entry
 - 创建 Web 智能客服虚拟人
 - 在 Android 应用中接入虚拟人 SDK
 - 通过 WebAPI 从后端驱动虚拟人
