@@ -102,17 +102,20 @@ def _save_state(project, state):
     return state
 
 
-def _write_verification_marker(project, status, issues):
+def _write_verification_marker(project, status, issues, next_action=None):
+    payload = {
+        "status": status,
+        "ready_to_deliver": False,
+        "issues_found": len(issues),
+        "issues_fixed": 0,
+        "remaining_issues": list(issues),
+        "gate": "web_delivery",
+    }
+    if next_action:
+        payload["next_action"] = next_action
     _write_json_atomic(
         _runtime_dir(project) / "verification-result.json",
-        {
-            "status": status,
-            "ready_to_deliver": False,
-            "issues_found": len(issues),
-            "issues_fixed": 0,
-            "remaining_issues": list(issues),
-            "gate": "web_delivery",
-        },
+        payload,
     )
 
 
@@ -329,9 +332,46 @@ def _project_changed_since(project, since_epoch):
     return False
 
 
-def _runtime_evidence_is_fresh(project, prepared_at):
+def _runtime_evidence_is_fresh(project, prepared_at, url, credential_fingerprint, interaction):
     path = _runtime_dir(project) / "web-runtime-evidence.json"
-    return path.is_file() and path.stat().st_mtime > prepared_at
+    evidence = _read_json(path)
+    if not evidence:
+        return False
+    if evidence.get("source") not in ("playwright", "browser"):
+        return False
+    if evidence.get("prepared_at_epoch") != prepared_at:
+        return False
+    if evidence.get("credential_fingerprint") != credential_fingerprint:
+        return False
+    if evidence.get("url") != url:
+        return False
+    if evidence.get("target_interaction") != interaction:
+        return False
+    return all(evidence.get(name) is True for name in (
+        "connected", "stream_start", "first_frame", "target_interaction_passed"
+    ))
+
+
+def _runtime_verification_action(project, url, interaction):
+    tools_dir = Path(__file__).resolve().parent
+    python = str(Path(sys.executable).resolve())
+    project = Path(project).resolve()
+    return {
+        "action": "run_web_runtime_evidence",
+        "required": True,
+        "commands": [
+            ('"{}" "{}" --project "{}" --url "{}" --interaction "{}"'
+             .format(python, tools_dir / "web_runtime_evidence.py", project,
+                     url, interaction)),
+            ('"{}" "{}" run --project "{}" --interaction "{}"'
+             .format(python, Path(__file__).resolve(), project, interaction)),
+        ],
+        "rules": [
+            "do not hand-write .runtime/web-runtime-evidence.json",
+            "the evidence script must click the page and collect browser state",
+            "run the same web_delivery command only after evidence collection succeeds",
+        ],
+    }
 
 
 def _next_action(project, status):
@@ -472,6 +512,7 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
         project,
         "needs_runtime_verification",
         ["connected", "stream_start", "first_frame", interaction],
+        next_action=_runtime_verification_action(project, url, interaction),
     )
     reported, report_reason = telemetry.report_gate(
         "web_delivery",
@@ -487,7 +528,8 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
                 "status": "awaiting_runtime_verification",
                 "port": selected_port,
                 "url": url,
-                "next": "run the same command after browser evidence is collected",
+                "next": "run web_runtime_evidence.py, then run the same web_delivery command",
+                "next_action": _runtime_verification_action(project, url, interaction),
                 "telemetry": "reported" if reported else "skipped:" + str(report_reason),
             },
             ensure_ascii=False,
@@ -564,7 +606,13 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
                 refresh_credentials=False,
                 open_browser=open_browser,
             )
-        if _runtime_evidence_is_fresh(project, prepared_at):
+        if _runtime_evidence_is_fresh(
+            project,
+            prepared_at,
+            state.get("url"),
+            state.get("credential_fingerprint"),
+            state.get("interaction", interaction),
+        ):
             return finish(project, interaction)
         print(
             json.dumps(
@@ -573,6 +621,9 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
                     "port": state.get("port"),
                     "url": state.get("url"),
                     "issues": state.get("issues", []),
+                    "next_action": _runtime_verification_action(
+                        project, state.get("url"), state.get("interaction", interaction)
+                    ),
                 },
                 ensure_ascii=False,
                 indent=2,

@@ -102,17 +102,20 @@ def _save_state(project, state):
     return state
 
 
-def _write_verification_marker(project, status, issues):
+def _write_verification_marker(project, status, issues, next_action=None):
+    payload = {
+        "status": status,
+        "ready_to_deliver": False,
+        "issues_found": len(issues),
+        "issues_fixed": 0,
+        "remaining_issues": list(issues),
+        "gate": "web_delivery",
+    }
+    if next_action:
+        payload["next_action"] = next_action
     _write_json_atomic(
         _runtime_dir(project) / "verification-result.json",
-        {
-            "status": status,
-            "ready_to_deliver": False,
-            "issues_found": len(issues),
-            "issues_fixed": 0,
-            "remaining_issues": list(issues),
-            "gate": "web_delivery",
-        },
+        payload,
     )
 
 
@@ -509,6 +512,7 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
         project,
         "needs_runtime_verification",
         ["connected", "stream_start", "first_frame", interaction],
+        next_action=_runtime_verification_action(project, url, interaction),
     )
     reported, report_reason = telemetry.report_gate(
         "web_delivery",

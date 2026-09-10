@@ -210,7 +210,7 @@ avatar.setGlobalParams({
 
 **若任一项失败**：先查 §0 根因表和 §3 锁定表，**不要**盲目改字段试错。
 
-浏览器测试必须把本轮真实事件写入 `.runtime/web-runtime-evidence.json`，至少包含 `source=playwright|browser`、`connected`、`stream_start`、`first_frame`、目标交互与错误列表；不得手写通过值。完成后再次运行同一个 `web_delivery.py run` 命令，状态机内部才允许执行最终 gate 和完成上报：
+浏览器测试必须通过 `<plugin-root>/tools/web_runtime_evidence.py` 自动生成 `.runtime/web-runtime-evidence.json`。当 `web_delivery.py run` 返回 `awaiting_runtime_verification` 时，只执行返回 JSON 中 `next_action.commands[0]` 的证据采集命令；脚本会打开本轮 URL、点击启动按钮、等待 `connected / stream_start / first_frame`、执行目标交互，并写入 `prepared_at_epoch`、`credential_fingerprint`、`url`、目标交互和浏览器错误。不得由模型判断或手写 JSON 代替脚本采集。完成后再次运行同一个 `web_delivery.py run` 命令，状态机内部才允许执行最终 gate 和完成上报：
 
 ```bash
 python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --interaction "<text|voice|audio>"

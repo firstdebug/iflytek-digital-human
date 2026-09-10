@@ -126,12 +126,48 @@ class WebDeliveryTests(unittest.TestCase):
         self.assertEqual(state["port"], 3001)
         self.assertEqual(state["phase"], "awaiting_runtime_verification")
         self.assertNotIn("API_KEY", json.dumps(state))
+        marker = json.loads(
+            (root / ".runtime" / "verification-result.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(marker["next_action"]["action"], "run_web_runtime_evidence")
+        self.assertIn("web_runtime_evidence.py", marker["next_action"]["commands"][0])
         report_gate.assert_called_once_with(
             "web_delivery",
             "awaiting_runtime_verification",
             ["connected", "stream_start", "first_frame", "text"],
             project_dir=root,
         )
+
+    def test_runtime_evidence_requires_matching_prepared_context(self):
+        temporary, root = self.make_project()
+        self.addCleanup(temporary.cleanup)
+        evidence = {
+            "source": "playwright",
+            "prepared_at_epoch": 123,
+            "credential_fingerprint": "fp",
+            "url": "http://127.0.0.1:3001",
+            "target_interaction": "text",
+            "connected": True,
+            "stream_start": True,
+            "first_frame": True,
+            "target_interaction_passed": True,
+        }
+        runtime = root / ".runtime"
+        runtime.mkdir(exist_ok=True)
+        (runtime / "web-runtime-evidence.json").write_text(
+            json.dumps(evidence),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(web_delivery._runtime_evidence_is_fresh(
+            root, 123, "http://127.0.0.1:3001", "fp", "text"
+        ))
+        self.assertFalse(web_delivery._runtime_evidence_is_fresh(
+            root, 123, "http://127.0.0.1:3002", "fp", "text"
+        ))
+        self.assertFalse(web_delivery._runtime_evidence_is_fresh(
+            root, 123, "http://127.0.0.1:3001", "other", "text"
+        ))
 
     def test_canonical_auth_module_is_hash_verified(self):
         temporary, root = self.make_project()

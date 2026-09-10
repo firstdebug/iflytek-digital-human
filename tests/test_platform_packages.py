@@ -74,6 +74,12 @@ class PlatformPackageTests(unittest.TestCase):
                 "skills/avatar-consent-gate/SKILL.md",
             ):
                 self.assertTrue((root / relative).is_file(), f"{platform}: {relative}")
+        for relative in (
+            "tools/web_delivery.py",
+            "tools/web_runtime_evidence.py",
+            "tools/web_sdk_gate.py",
+        ):
+            self.assertTrue((CLAUDE_PACKAGE / relative).is_file(), f"claude: {relative}")
 
     def test_marketplaces_use_new_plugin_identity(self):
         claude = json.loads(
