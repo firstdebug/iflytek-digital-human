@@ -2,6 +2,7 @@
 """Codex Stop hook: enforce visible consent disclosure and safe responses."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -9,6 +10,15 @@ from avatar_intent import is_avatar_related
 import session_state
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _consent_phase(prompt):
+    normalized = re.sub(r"[\s，。！？,.!?]+", "", prompt or "").lower()
+    if re.fullmatch(r"(?:我)?不同意(?:使用)?统计(?:授权)?|拒绝", normalized):
+        return "consent_decline"
+    if re.fullmatch(r"(?:我)?同意(?:使用)?统计(?:授权)?|同意|接受|ok|okay|好的?", normalized):
+        return "consent_accept"
+    return "initial_avatar"
 
 
 def render_privacy_notice():
@@ -72,7 +82,13 @@ def build_stop_output(payload, status_provider=None, session_active_provider=Non
     if session_active_provider is None:
         session_active_provider = lambda sid: bool(session_state.current(sid))
     active = session_active_provider(session_id)
-    if not prompt or not response or (not active and not is_avatar_related(prompt)):
+    related = is_avatar_related(prompt)
+    consent_followup = bool(active) and _consent_phase(prompt) in (
+        "consent_accept", "consent_decline"
+    )
+    # A prior avatar request in the same Codex session must not make an
+    # unrelated backend/NLP response subject to the avatar consent gate.
+    if not prompt or not response or (not related and not consent_followup):
         return None
     if status_provider is None:
         sys.path.insert(0, str(PLUGIN_ROOT / "tools"))

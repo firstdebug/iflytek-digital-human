@@ -72,6 +72,22 @@ class CodexHookPackageTests(unittest.TestCase):
         self.assertIn("完整能力清单", context)
         self.assertIn("同意使用统计", context)
 
+    def test_route_hint_ignores_backend_nlp_debug_with_quoted_avatar_text(self):
+        route = load_hook_module("route_hint")
+        prompt = (
+            "D:\\codeRep\\avatar-interaction-svc\\avatar-common\\src\\main\\java\\"
+            "cn\\xfyun\\avatar\\common\\data\\message\\NlpMessage.java，"
+            "nlp-svc 与 OpenAI 第三方模型做 SSE 连接，如何启动服务完成一次经过 svc 的测试？\n\n"
+            "上一轮粘贴内容：按当前虚拟人插件规范，需要明确选择隐私同意。"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
+                output = route.build_hook_output(
+                    {"session_id": "backend-nlp", "prompt": prompt},
+                    status_provider=lambda: "undecided",
+                )
+        self.assertIsNone(output)
+
     def test_route_hint_matches_explicit_codex_skill_invocation(self):
         route = load_hook_module("route_hint")
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,6 +100,14 @@ class CodexHookPackageTests(unittest.TestCase):
                     status_provider=lambda: "undecided",
                 )
         self.assertIsNotNone(output)
+
+    def test_explicit_skill_invocation_wins_over_backend_markers(self):
+        intent = load_hook_module("avatar_intent")
+        prompt = (
+            "$iflytek-digital-human:avatar-workflow-entry，"
+            "检查 nlp-svc 的 OpenAI SSE 返回"
+        )
+        self.assertTrue(intent.is_avatar_related(prompt))
 
     def test_route_hint_recognizes_consent_followup_in_active_session(self):
         route = load_hook_module("route_hint")
@@ -243,6 +267,28 @@ class CodexHookPackageTests(unittest.TestCase):
                 )
         self.assertEqual(output["decision"], "block")
         self.assertIn("consent --accept", output["reason"])
+
+    def test_stop_guard_ignores_unrelated_backend_prompt_in_old_avatar_session(self):
+        response_guard = load_hook_module("response_guard")
+        prompt = (
+            "D:\\codeRep\\avatar-interaction-svc\\avatar-common\\src\\main\\java\\"
+            "cn\\xfyun\\avatar\\common\\data\\message\\NlpMessage.java，"
+            "nlp-svc 与 OpenAI 第三方模型做 SSE 连接，如何启动服务完成一次测试？"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
+                response_guard.session_state.mark_avatar_session(
+                    {"session_id": "s1", "cwd": tmp}, "initial_avatar"
+                )
+                output = response_guard.build_stop_output(
+                    {
+                        "session_id": "s1",
+                        "prompt": prompt,
+                        "last_assistant_message": "服务启动命令如下。",
+                    },
+                    status_provider=lambda: "undecided",
+                )
+        self.assertIsNone(output)
 
     def test_codex_transcript_parser_reads_latest_exchange(self):
         response_guard = load_hook_module("response_guard")
