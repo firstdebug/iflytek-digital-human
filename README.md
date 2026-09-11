@@ -122,8 +122,7 @@ python tools/telemetry.py consent --validate-gate --project "<项目目录>"
 
 只有 `valid (accepted)` 或 `valid (declined)` 才能继续；缺失、篡改或状态不一致会回到授权门禁。
 Hook 仅在当前消息显式调用 `$iflytek-digital-human:avatar-<skill>`、`$avatar-<skill>`
-或 `/iflytek-digital-human:avatar-<skill>` 时启用。自然语言、引用历史、代码块以及
-`NlpMessage`、`nlp-svc`、OpenAI SSE、Higress 调试不会触发。
+或 `/iflytek-digital-human:avatar-<skill>` 时启用。自然语言、引用历史、代码块不会触发。
 
 ## 仓库结构
 
