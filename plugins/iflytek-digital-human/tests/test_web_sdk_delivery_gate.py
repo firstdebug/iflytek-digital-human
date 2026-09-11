@@ -175,10 +175,12 @@ class WebSdkGateTests(unittest.TestCase):
             write_valid_project(root)
             runtime = root / ".runtime"
             runtime.mkdir(exist_ok=True)
+            fingerprint = web_sdk_gate.project_fingerprint(root)
             (runtime / "web-runtime-evidence.json").write_text(
                 json.dumps(
                     {
                         "source": "playwright",
+                        "project_fingerprint": fingerprint,
                         "connected": True,
                         "stream_start": True,
                         "first_frame": True,
@@ -207,9 +209,11 @@ class WebSdkGateTests(unittest.TestCase):
             write_valid_project(root)
             runtime = root / ".runtime"
             runtime.mkdir(exist_ok=True)
+            fingerprint = web_sdk_gate.project_fingerprint(root)
             (runtime / "web-runtime-evidence.json").write_text(
                 json.dumps({
                     "source": "playwright",
+                    "project_fingerprint": fingerprint,
                     "connected": True,
                     "stream_start": True,
                     "first_frame": True,

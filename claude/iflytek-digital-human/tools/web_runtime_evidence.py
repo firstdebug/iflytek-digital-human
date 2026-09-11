@@ -62,6 +62,7 @@ const options = JSON.parse(process.argv[2]);
 const errors = [];
 const warnings = [];
 const responses = [];
+const eventLog = [];
 
 async function launchBrowser() {
   const attempts = [
@@ -81,10 +82,11 @@ async function launchBrowser() {
   throw new Error(`browser_launch_failed:${failures.join('|')}`);
 }
 
-async function waitFor(page, check, timeoutMs, label) {
+async function waitFor(page, check, timeoutMs, label, logPattern) {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
-    if (await page.evaluate(check)) return true;
+    if (await page.evaluate(check)
+        || (logPattern && eventLog.some(text => logPattern.test(text)))) return true;
     await page.waitForTimeout(500);
   }
   errors.push(`timeout:${label}`);
@@ -134,6 +136,7 @@ const page = await browser.newPage({
 page.on('pageerror', error => errors.push(`pageerror:${error.message}`));
 page.on('console', message => {
   const text = message.text();
+  eventLog.push(text);
   if (message.type() === 'error') errors.push(`console:${text}`);
   if (message.type() === 'warning' || message.type() === 'warn') {
     warnings.push(text);
@@ -151,6 +154,7 @@ try {
 
   await clickFirst(page, [
     { css: '#start-button' },
+    { css: '#init-btn' },
     { role: 'button', name: /启动|开始|Start/i }
   ], 'start');
 
@@ -167,10 +171,13 @@ try {
     page,
     () => {
       const bodyHas = text => document.body && document.body.innerText.includes(text);
-      return bodyHas('云端推流已开始') || Boolean(window.__avatarEvidence?.stream_start);
+      return bodyHas('云端推流已开始')
+        || Boolean(window.__avatarEvidence?.stream_start)
+        || Boolean(window.__avatarEvidence?.streamStart);
     },
     options.timeoutMs,
-    'stream_start'
+    'stream_start',
+    /推流|stream_start/i
   );
   const firstFrame = await waitFor(
     page,
@@ -186,20 +193,36 @@ try {
   if (options.interaction === 'text') {
     await fillFirst(page, [
       { css: '#message' },
+      { css: '#text-input' },
       { role: 'textbox', name: /输入文本|文本|message/i }
     ], options.text, 'message');
+    const assistantCountBefore = await page.locator(
+      '#messages .message.assistant, .messages .message.assistant'
+    ).count();
+    await page.evaluate(count => { window.__evidenceAssistantCountBefore = count; },
+      assistantCountBefore);
     await clickFirst(page, [
       { css: '#send-button' },
+      { css: '#send-btn' },
       { role: 'button', name: /发送|Send/i }
     ], 'send');
     interactionPassed = await waitFor(
-    page,
-    () => {
-      const bodyHas = text => document.body && document.body.innerText.includes(text);
-      return bodyHas('文本已发送') || Boolean(window.__avatarEvidence?.target_interaction_passed);
+      page,
+      () => {
+        const bodyHas = text => document.body && document.body.innerText.includes(text);
+        const messages = document.querySelector('#messages');
+        const assistantReply = messages && messages.querySelector('.message.assistant');
+        const assistantCount = messages
+          ? messages.querySelectorAll('.message.assistant').length : 0;
+        return bodyHas('文本已发送')
+          || Boolean(assistantCount > (window.__evidenceAssistantCountBefore || 0)
+            && assistantReply && assistantReply.textContent?.trim())
+          || Boolean(window.__avatarEvidence?.target_interaction_passed)
+          || Boolean(window.__avatarEvidence?.targetInteractionPassed);
     },
-    options.timeoutMs,
-    'text'
+      options.timeoutMs,
+      'text',
+      /NLP 回复|文本已发送|target_interaction_passed/i
   );
   } else {
     errors.push(`unsupported_interaction:${options.interaction}`);
@@ -230,6 +253,7 @@ try {
     collected_at: new Date().toISOString(),
     prepared_at_epoch: options.preparedAtEpoch,
     credential_fingerprint: options.credentialFingerprint,
+    project_fingerprint: options.projectFingerprint,
     connected,
     stream_start: streamStart,
     first_frame: firstFrame && dom.video_element_found,
@@ -238,6 +262,7 @@ try {
     errors,
     warnings,
     responses,
+    event_log: eventLog.slice(-100),
     checks: dom
   };
   console.log(JSON.stringify(evidence, null, 2));
@@ -249,6 +274,7 @@ try {
 
 def _run_node(project, options):
     runtime = _runtime_dir(project)
+    runtime.mkdir(parents=True, exist_ok=True)
     runner = runtime / "web-runtime-evidence-runner.mjs"
     runner.write_text(textwrap.dedent(_runner_source()).strip() + "\n", encoding="utf-8")
     command = ["node", str(runner), json.dumps(options, ensure_ascii=False)]
@@ -256,6 +282,8 @@ def _run_node(project, options):
         command,
         cwd=str(project),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=max(30, int(options["timeoutMs"] / 1000) * 4),
@@ -282,6 +310,7 @@ def collect(project, url=None, interaction="text", text=None, timeout_ms=120000)
         "viewportHeight": 1200,
         "preparedAtEpoch": state.get("prepared_at_epoch"),
         "credentialFingerprint": state.get("credential_fingerprint"),
+        "projectFingerprint": state.get("project_fingerprint"),
     }
     try:
         result = _run_node(project, options)

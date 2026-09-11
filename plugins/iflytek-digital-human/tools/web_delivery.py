@@ -332,7 +332,21 @@ def _project_changed_since(project, since_epoch):
     return False
 
 
-def _runtime_evidence_is_fresh(project, prepared_at, url, credential_fingerprint, interaction):
+def _project_fingerprint(project):
+    return web_sdk_gate.project_fingerprint(project)
+
+
+def _resolve_workflow_id(workflow_id=None, state=None):
+    state = state or {}
+    return (
+        workflow_id
+        or os.environ.get("IFLYTEK_DIGITAL_HUMAN_WORKFLOW_ID")
+        or state.get("workflow_id")
+    )
+
+
+def _runtime_evidence_is_fresh(project, prepared_at, url, credential_fingerprint,
+                               interaction, project_fingerprint):
     path = _runtime_dir(project) / "web-runtime-evidence.json"
     evidence = _read_json(path)
     if not evidence:
@@ -343,6 +357,8 @@ def _runtime_evidence_is_fresh(project, prepared_at, url, credential_fingerprint
         return False
     if evidence.get("credential_fingerprint") != credential_fingerprint:
         return False
+    if evidence.get("project_fingerprint") != project_fingerprint:
+        return False
     if evidence.get("url") != url:
         return False
     if evidence.get("target_interaction") != interaction:
@@ -352,10 +368,16 @@ def _runtime_evidence_is_fresh(project, prepared_at, url, credential_fingerprint
     ))
 
 
-def _runtime_verification_action(project, url, interaction):
+def _runtime_verification_action(project, url, interaction, workflow_id=None):
     tools_dir = Path(__file__).resolve().parent
     python = str(Path(sys.executable).resolve())
     project = Path(project).resolve()
+    delivery_command = (
+        '"{}" "{}" run --project "{}" --interaction "{}"'
+        .format(python, Path(__file__).resolve(), project, interaction)
+    )
+    if workflow_id:
+        delivery_command += ' --workflow "{}"'.format(workflow_id)
     return {
         "action": "run_web_runtime_evidence",
         "required": True,
@@ -363,8 +385,7 @@ def _runtime_verification_action(project, url, interaction):
             ('"{}" "{}" --project "{}" --url "{}" --interaction "{}"'
              .format(python, tools_dir / "web_runtime_evidence.py", project,
                      url, interaction)),
-            ('"{}" "{}" run --project "{}" --interaction "{}"'
-             .format(python, Path(__file__).resolve(), project, interaction)),
+            delivery_command,
         ],
         "rules": [
             "do not hand-write .runtime/web-runtime-evidence.json",
@@ -374,7 +395,7 @@ def _runtime_verification_action(project, url, interaction):
     }
 
 
-def _next_action(project, status):
+def _next_action(project, status, workflow_id=None):
     if status != "blocked_missing_credentials":
         return None
     tools_dir = Path(__file__).resolve().parent
@@ -387,8 +408,14 @@ def _next_action(project, status):
             '"{}" "{}"'.format(python, tools_dir / "xfyun_query_services.py"),
             (
                 '"{}" "{}" run --project "{}" --app-id <appId> '
-                '--scene-id <sceneId> --interaction <text|voice|audio>'
-            ).format(python, Path(__file__).resolve(), Path(project).resolve()),
+                '--scene-id <sceneId> --interaction <text|voice|audio>{workflow}'
+            ).format(
+                python,
+                Path(__file__).resolve(),
+                Path(project).resolve(),
+                workflow=(' --workflow "{}"'.format(workflow_id)
+                          if workflow_id else ''),
+            ),
         ],
         "rules": [
             "execute commands instead of asking the user to provide WS_URL",
@@ -398,20 +425,26 @@ def _next_action(project, status):
     }
 
 
-def _blocked(project, status, issues, state=None):
+def _blocked(project, status, issues, state=None, workflow_id=None):
     state = dict(state or {})
+    workflow_id = _resolve_workflow_id(workflow_id, state)
     state.update({"phase": status, "ready_to_deliver": False, "issues": issues})
+    if workflow_id:
+        state["workflow_id"] = workflow_id
     _save_state(project, state)
     _write_verification_marker(project, status, issues)
     reported, report_reason = telemetry.report_gate(
-        "web_delivery", status, issues, project_dir=Path(project).resolve()
+        "web_delivery", status, issues, project_dir=Path(project).resolve(),
+        workflow_id=workflow_id
     )
     payload = {
         "status": status,
         "issues": issues,
         "telemetry": "reported" if reported else "skipped:" + str(report_reason),
     }
-    next_action = _next_action(project, status)
+    if workflow_id:
+        payload["workflow_id"] = workflow_id
+    next_action = _next_action(project, status, workflow_id=workflow_id)
     if next_action:
         payload["next_action"] = next_action
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -419,10 +452,12 @@ def _blocked(project, status, issues, state=None):
 
 
 def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
-            refresh_credentials=False, open_browser=True):
+            refresh_credentials=False, open_browser=True, workflow_id=None):
     project = Path(project).resolve()
+    workflow_id = _resolve_workflow_id(workflow_id, _load_state(project))
     if not (project / "server.js").is_file():
-        return _blocked(project, "blocked_server_lifecycle", ["server_js_missing"])
+        return _blocked(project, "blocked_server_lifecycle", ["server_js_missing"],
+                        workflow_id=workflow_id)
 
     state = _load_state(project)
     env_path = project / ".env"
@@ -434,23 +469,27 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
                 "blocked_missing_credentials",
                 credential_issues + ["app_id_and_scene_id_required"],
                 state,
+                workflow_id,
             )
         if not write_env_safe.write_env(
             app_id, scene_id, env_path, profile="web-sdk"
         ):
             return _blocked(
-                project, "blocked_missing_credentials", ["platform_fetch_failed"], state
+                project, "blocked_missing_credentials", ["platform_fetch_failed"],
+                state, workflow_id
             )
 
     credential_issues = _credential_issues(project)
     if credential_issues:
-        return _blocked(project, "blocked_missing_credentials", credential_issues, state)
+        return _blocked(project, "blocked_missing_credentials", credential_issues,
+                        state, workflow_id)
 
     websocket_auth.install(project)
     server_usage_issues = websocket_auth.server_usage_issues(project)
     if server_usage_issues:
         return _blocked(
-            project, "blocked_server_lifecycle", server_usage_issues, state
+            project, "blocked_server_lifecycle", server_usage_issues, state,
+            workflow_id
         )
     artifact = sdk_artifact.ensure_artifact("web", project)
     if artifact.get("artifact_status") != "ready":
@@ -459,6 +498,7 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
             "blocked_missing_sdk",
             [artifact.get("reason") or "sdk_not_ready"],
             state,
+            workflow_id,
         )
 
     server_state = _read_json(_server_path(project)) or {}
@@ -476,7 +516,8 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
         try:
             selected_port = _choose_initial_port(port or previous_port)
         except RuntimeError as exc:
-            return _blocked(project, "blocked_server_lifecycle", [str(exc)], state)
+            return _blocked(project, "blocked_server_lifecycle", [str(exc)], state,
+                            workflow_id)
     if not server_reusable:
         try:
             server_state = _start_server(project, selected_port, fingerprint)
@@ -486,14 +527,17 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
                 "blocked_server_lifecycle",
                 ["server_start_failed:" + exc.__class__.__name__],
                 state,
+                workflow_id,
             )
 
     healthy, issues = _server_health(project, server_state)
     if not healthy:
-        return _blocked(project, "blocked_server_lifecycle", issues, state)
+        return _blocked(project, "blocked_server_lifecycle", issues, state,
+                        workflow_id)
 
     prepared_at = time.time()
     url = "http://127.0.0.1:{}".format(selected_port)
+    project_fingerprint = _project_fingerprint(project)
     state.update(
         {
             "phase": "awaiting_runtime_verification",
@@ -503,6 +547,8 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
             "pid": server_state.get("pid"),
             "prepared_at_epoch": prepared_at,
             "credential_fingerprint": fingerprint,
+            "project_fingerprint": project_fingerprint,
+            "workflow_id": workflow_id,
             "url": url,
             "issues": ["connected", "stream_start", "first_frame", interaction],
         }
@@ -512,13 +558,15 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
         project,
         "needs_runtime_verification",
         ["connected", "stream_start", "first_frame", interaction],
-        next_action=_runtime_verification_action(project, url, interaction),
+        next_action=_runtime_verification_action(project, url, interaction,
+                                                  workflow_id),
     )
     reported, report_reason = telemetry.report_gate(
         "web_delivery",
         "awaiting_runtime_verification",
         ["connected", "stream_start", "first_frame", interaction],
         project_dir=project,
+        workflow_id=workflow_id,
     )
     if open_browser:
         webbrowser.open(url)
@@ -529,7 +577,10 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
                 "port": selected_port,
                 "url": url,
                 "next": "run web_runtime_evidence.py, then run the same web_delivery command",
-                "next_action": _runtime_verification_action(project, url, interaction),
+                "next_action": _runtime_verification_action(
+                    project, url, interaction, workflow_id
+                ),
+                "workflow_id": workflow_id,
                 "telemetry": "reported" if reported else "skipped:" + str(report_reason),
             },
             ensure_ascii=False,
@@ -539,13 +590,15 @@ def prepare(project, app_id=None, scene_id=None, interaction="text", port=None,
     return 3
 
 
-def finish(project, interaction="text"):
+def finish(project, interaction="text", workflow_id=None):
     project = Path(project).resolve()
     state = _load_state(project)
+    workflow_id = _resolve_workflow_id(workflow_id, state)
     server_state = _read_json(_server_path(project)) or {}
     healthy, issues = _server_health(project, server_state, timeout=2)
     if not healthy:
-        return _blocked(project, "blocked_server_lifecycle", issues, state)
+        return _blocked(project, "blocked_server_lifecycle", issues, state,
+                        workflow_id)
     result = web_sdk_gate.run_checks(project, interaction)
     state.update(
         {
@@ -561,12 +614,14 @@ def finish(project, interaction="text"):
             result["status"],
             result["remaining_issues"],
             project_dir=project,
+            workflow_id=workflow_id,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 3 if result["status"] == "needs_runtime_verification" else 2
 
     completed, reason = telemetry.report_complete(
-        workflow_type="sdk_integration", project_dir=project
+        workflow_type="sdk_integration", project_dir=project,
+        workflow_id=workflow_id,
     )
     state["telemetry"] = "completed" if completed else "skipped:" + str(reason)
     _save_state(project, state)
@@ -576,6 +631,7 @@ def finish(project, interaction="text"):
                 "status": "ready_to_deliver",
                 "ready_to_deliver": True,
                 "telemetry": state["telemetry"],
+                "workflow_id": workflow_id,
             },
             ensure_ascii=False,
             indent=2,
@@ -585,14 +641,16 @@ def finish(project, interaction="text"):
 
 
 def run(project, app_id=None, scene_id=None, interaction="text", port=None,
-        refresh_credentials=False, open_browser=True):
+        refresh_credentials=False, open_browser=True, workflow_id=None):
     project = Path(project).resolve()
     state = _load_state(project)
+    workflow_id = _resolve_workflow_id(workflow_id, state)
     prepared_at = state.get("prepared_at_epoch", 0)
+    project_fingerprint = _project_fingerprint(project)
     if (
         state.get("phase") == "awaiting_runtime_verification"
         and prepared_at
-        and not _project_changed_since(project, prepared_at)
+        and state.get("project_fingerprint") == project_fingerprint
     ):
         server_state = _read_json(_server_path(project)) or {}
         healthy, health_issues = _server_health(project, server_state, timeout=2)
@@ -605,6 +663,7 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
                 port=port,
                 refresh_credentials=False,
                 open_browser=open_browser,
+                workflow_id=workflow_id,
             )
         if _runtime_evidence_is_fresh(
             project,
@@ -612,8 +671,9 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
             state.get("url"),
             state.get("credential_fingerprint"),
             state.get("interaction", interaction),
+            project_fingerprint,
         ):
-            return finish(project, interaction)
+            return finish(project, interaction, workflow_id=workflow_id)
         print(
             json.dumps(
                 {
@@ -622,18 +682,20 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
                     "url": state.get("url"),
                     "issues": state.get("issues", []),
                     "next_action": _runtime_verification_action(
-                        project, state.get("url"), state.get("interaction", interaction)
+                        project, state.get("url"), state.get("interaction", interaction),
+                        workflow_id,
                     ),
+                    "workflow_id": workflow_id,
                 },
                 ensure_ascii=False,
                 indent=2,
             )
         )
         return 3
-    if state.get("phase") == "ready_to_deliver" and not _project_changed_since(
-        project, state.get("updated_at_epoch", 0)
-    ):
-        print(json.dumps({"status": "ready_to_deliver"}, indent=2))
+    if (state.get("phase") == "ready_to_deliver" and
+            state.get("project_fingerprint") == project_fingerprint):
+        print(json.dumps({"status": "ready_to_deliver",
+                          "workflow_id": workflow_id}, indent=2))
         return 0
     return prepare(
         project,
@@ -643,6 +705,7 @@ def run(project, app_id=None, scene_id=None, interaction="text", port=None,
         port=port,
         refresh_credentials=refresh_credentials,
         open_browser=open_browser,
+        workflow_id=workflow_id,
     )
 
 
@@ -657,6 +720,7 @@ def main(argv=None):
     command.add_argument("--port", type=int)
     command.add_argument("--refresh-credentials", action="store_true")
     command.add_argument("--no-browser", action="store_true")
+    command.add_argument("--workflow", default=None)
     status = sub.add_parser("status")
     status.add_argument("--project", required=True)
     args = parser.parse_args(argv)
@@ -670,6 +734,7 @@ def main(argv=None):
             port=args.port,
             refresh_credentials=args.refresh_credentials,
             open_browser=not args.no_browser,
+            workflow_id=args.workflow,
         )
     if cmd == "status":
         project = Path(args.project).resolve()

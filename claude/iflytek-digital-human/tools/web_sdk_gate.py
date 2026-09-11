@@ -39,6 +39,16 @@ HALLUCINATED_APIS = ("setServerUrl", "getPlayer")
 REQUIRED_SDK_METHODS = ("setApiInfo", "setGlobalParams", "start", "writeText")
 AUTH_FAILURE_CODES = (1008, 10110, 10113, 10114, 10120, 10121, 11203)
 AUTH_FAILURE_TEXT = ("avatar authentication failed", "authorization invalid")
+FINGERPRINT_FILES = (
+    ".env",
+    ".env.local",
+    "server.js",
+    "xfyun-auth.mjs",
+    "package.json",
+    "public/app.js",
+    ".runtime/sdk-artifact.json",
+    ".runtime/websocket-auth.json",
+)
 
 
 def _sha256(path):
@@ -46,6 +56,22 @@ def _sha256(path):
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def project_fingerprint(project):
+    project = Path(project).resolve()
+    digest = hashlib.sha256()
+    for relative in FINGERPRINT_FILES:
+        path = project / relative
+        normalized = relative.replace("\\", "/")
+        digest.update(normalized.encode("utf-8"))
+        digest.update(b"\0")
+        if path.is_file():
+            digest.update(_sha256(path).encode("ascii"))
+        else:
+            digest.update(b"<missing>")
+        digest.update(b"\0")
     return digest.hexdigest()
 
 
@@ -192,6 +218,8 @@ def _default_node_check(server):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=20,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -256,7 +284,7 @@ def _default_server_smoke(project):
                 process.wait(timeout=3)
 
 
-def _runtime_issues(project, required_interaction, latest_static_mtime):
+def _runtime_issues(project, required_interaction, expected_project_fingerprint):
     evidence_path = project / ".runtime" / "web-runtime-evidence.json"
     evidence = _read_json(evidence_path)
     if not evidence:
@@ -265,13 +293,21 @@ def _runtime_issues(project, required_interaction, latest_static_mtime):
     # Authentication rejection takes precedence over later-looking success flags.
     if _has_authentication_failure(evidence):
         issues.append("authentication_failed")
+    state = _read_json(project / ".runtime" / "web-delivery.json") or {}
     if evidence.get("source") not in ("playwright", "browser"):
         issues.append("runtime_evidence_source")
-    try:
-        if evidence_path.stat().st_mtime < latest_static_mtime:
-            issues.append("runtime_evidence_stale")
-    except OSError:
-        issues.append("runtime_evidence_missing")
+    if (state.get("prepared_at_epoch") and
+            evidence.get("prepared_at_epoch") != state.get("prepared_at_epoch")):
+        issues.append("runtime_evidence_prepared_at_mismatch")
+    if state.get("url") and evidence.get("url") != state.get("url"):
+        issues.append("runtime_evidence_url_mismatch")
+    expected_credential_fingerprint = state.get("credential_fingerprint")
+    if (expected_credential_fingerprint and
+            evidence.get("credential_fingerprint") != expected_credential_fingerprint):
+        issues.append("runtime_evidence_credential_mismatch")
+    if (expected_project_fingerprint and
+            evidence.get("project_fingerprint") != expected_project_fingerprint):
+        issues.append("runtime_evidence_stale")
     for name in ("connected", "stream_start", "first_frame"):
         if evidence.get(name) is not True:
             issues.append(name)
@@ -320,16 +356,9 @@ def run_checks(project, required_interaction="text", node_check=None,
         static_issues.extend(smoke_issues)
     static_issues = list(dict.fromkeys(static_issues))
 
-    static_files = [
-        path
-        for path in (project / ".runtime" / "sdk-artifact.json",
-                     project / ".env", project / ".env.local",
-                     project / "server.js", project / "public" / "app.js")
-        if path.is_file()
-    ]
-    latest_static_mtime = max((path.stat().st_mtime for path in static_files), default=0)
+    fingerprint = project_fingerprint(project)
     runtime_issues = _runtime_issues(
-        project, required_interaction, latest_static_mtime
+        project, required_interaction, fingerprint
     )
 
     if static_issues:
@@ -345,6 +374,7 @@ def run_checks(project, required_interaction="text", node_check=None,
         "static_issues": static_issues,
         "runtime_issues": runtime_issues,
         "remaining_issues": remaining,
+        "project_fingerprint": fingerprint,
     }
     marker = {
         "status": status,

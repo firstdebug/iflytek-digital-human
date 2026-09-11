@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parents[1] / "claude" / "iflytek-digital-human"
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 TOOLS_DIR = PLUGIN_ROOT / "tools"
 sys.path.insert(0, str(TOOLS_DIR))
 

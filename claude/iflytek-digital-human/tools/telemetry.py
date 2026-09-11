@@ -147,7 +147,7 @@ def _find_workflow_for_project(state, project_dir):
 
 
 def _update_status(session_id, status, workflow_type=None, reason=None,
-                   verify=True, project_dir=None):
+                   verify=True, project_dir=None, workflow_id=None):
     if not is_enabled():
         return False, 'disabled'
     # A project-scoped report must not fall back to the process-global
@@ -163,7 +163,9 @@ def _update_status(session_id, status, workflow_type=None, reason=None,
         if state is None:
             return False, 'state_lock_timeout'
         missing_reason = None
-        if project_dir and not sid:
+        if workflow_id:
+            item = _find_workflow(state, workflow_id)
+        elif project_dir and not sid:
             item = _find_workflow_for_project(state, project_dir)
         elif sid:
             item = _find_workflow(state, active_workflow_id(state, sid))
@@ -175,8 +177,9 @@ def _update_status(session_id, status, workflow_type=None, reason=None,
             return False, 'no_session'
         if not item:
             return False, (missing_reason or
-                           ('ambiguous_workflow' if project_dir and not sid
-                            else 'no_workflow_row'))
+                           ('no_workflow_row' if workflow_id else
+                            ('ambiguous_workflow' if project_dir and not sid
+                             else 'no_workflow_row')))
         workflow_id = item.get('workflow_id')
         target_type = workflow_type or item.get('workflow_type')
         method, detail = 'reported', {'self_reported': True}
@@ -220,25 +223,30 @@ def _update_status(session_id, status, workflow_type=None, reason=None,
     return changed, method
 
 
-def report_complete(session_id=None, workflow_type=None, project_dir=None):
+def report_complete(session_id=None, workflow_type=None, project_dir=None,
+                    workflow_id=None):
     changed, info = _update_status(session_id, 'completed', workflow_type,
-                                   project_dir=project_dir)
+                                   project_dir=project_dir,
+                                   workflow_id=workflow_id)
     _flush_after_change(changed)
     return changed, info
 
 
-def report_fail(session_id=None, reason=None, project_dir=None):
+def report_fail(session_id=None, reason=None, project_dir=None,
+                workflow_id=None):
     changed, info = _update_status(session_id, 'failed', reason=reason, verify=False,
-                                   project_dir=project_dir)
+                                   project_dir=project_dir,
+                                   workflow_id=workflow_id)
     _flush_after_change(changed)
     return changed, info
 
 
-def report_gate(gate, gate_status, issues, session_id=None, project_dir=None):
+def report_gate(gate, gate_status, issues, session_id=None, project_dir=None,
+                workflow_id=None):
     if not is_enabled():
         return False, 'disabled'
     sid = session_id
-    if not sid and not project_dir:
+    if not sid and not project_dir and not workflow_id:
         return False, 'no_session'
     detail = sanitize_completion_detail({
         'gate': str(gate),
@@ -249,11 +257,16 @@ def report_gate(gate, gate_status, issues, session_id=None, project_dir=None):
     with locked_state() as state:
         if state is None:
             return False, 'state_lock_timeout'
-        item = (_find_workflow_for_project(state, project_dir)
-                if project_dir and not sid else
-                _find_workflow(state, active_workflow_id(state, sid)))
+        if workflow_id:
+            item = _find_workflow(state, workflow_id)
+        else:
+            item = (_find_workflow_for_project(state, project_dir)
+                    if project_dir and not sid else
+                    _find_workflow(state, active_workflow_id(state, sid)))
         if not item:
-            return False, 'ambiguous_workflow' if project_dir and not sid else 'no_workflow_row'
+            return False, ('no_workflow_row' if workflow_id else
+                           ('ambiguous_workflow' if project_dir and not sid
+                            else 'no_workflow_row'))
         if item.get('status') != 'in_progress':
             return False, 'workflow_not_in_progress'
         changed = _bump(item, completion_detail=detail)
@@ -343,10 +356,12 @@ def main():
     sub = parser.add_subparsers(dest='cmd')
     complete = sub.add_parser('complete')
     complete.add_argument('--session', default=None)
+    complete.add_argument('--workflow', default=None)
     complete.add_argument('--type', dest='wf_type', default=None)
     complete.add_argument('--project', default=None)
     fail = sub.add_parser('fail')
     fail.add_argument('--session', default=None)
+    fail.add_argument('--workflow', default=None)
     fail.add_argument('--reason', default=None)
     fail.add_argument('--project', default=None)
     consent = sub.add_parser('consent')
@@ -362,10 +377,12 @@ def main():
     purge.add_argument('--days', type=int, default=7)
     args = parser.parse_args()
     if args.cmd == 'complete':
-        ok, info = report_complete(args.session, args.wf_type, args.project)
+        ok, info = report_complete(args.session, args.wf_type, args.project,
+                                   args.workflow)
         print('completed via {}'.format(info) if ok else 'skipped ({})'.format(info))
     elif args.cmd == 'fail':
-        ok, info = report_fail(args.session, args.reason, args.project)
+        ok, info = report_fail(args.session, args.reason, args.project,
+                               args.workflow)
         print('marked failed' if ok else 'skipped ({})'.format(info))
     elif args.cmd == 'consent':
         if args.status:

@@ -367,11 +367,12 @@ def report_fail(session_id=None, reason=None, project_dir=None,
     return changed, info
 
 
-def report_gate(gate, gate_status, issues, session_id=None, project_dir=None):
+def report_gate(gate, gate_status, issues, session_id=None, project_dir=None,
+                workflow_id=None):
     if not is_enabled():
         return False, 'disabled'
     sid = session_id
-    if not sid and not project_dir:
+    if not sid and not project_dir and not workflow_id:
         return False, 'no_session'
     detail = sanitize_completion_detail({
         'gate': str(gate),
@@ -382,9 +383,12 @@ def report_gate(gate, gate_status, issues, session_id=None, project_dir=None):
     with locked_state() as state:
         if state is None:
             return False, 'state_lock_timeout'
-        item = (_find_workflow_for_project(state, project_dir)
-                if project_dir and not sid else
-                _find_workflow(state, active_workflow_id(state, sid)))
+        if workflow_id:
+            item = _find_workflow(state, workflow_id)
+        else:
+            item = (_find_workflow_for_project(state, project_dir)
+                    if project_dir and not sid else
+                    _find_workflow(state, active_workflow_id(state, sid)))
         if not item:
             return False, 'ambiguous_workflow' if project_dir and not sid else 'no_workflow_row'
         if item.get('status') != 'in_progress':

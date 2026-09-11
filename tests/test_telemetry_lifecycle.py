@@ -902,6 +902,60 @@ class ReporterTests(JsonStateSandbox):
         self.assertTrue(all(item["status"] == "in_progress"
                             for item in self.load()["workflows"]))
 
+    def test_explicit_workflow_id_completes_even_when_project_is_ambiguous(self):
+        project = self.root / "avatar-web-app"
+        marker = project / ".runtime" / "verification-result.json"
+        marker.parent.mkdir(parents=True)
+        marker.write_text(json.dumps({
+            "ready_to_deliver": True,
+            "remaining_issues": [],
+        }), encoding="utf-8")
+        state = telemetry_common._empty_state()
+        state["workflows"] = [
+            workflow("wf-one", cwd=str(self.root), workflow_type="sdk_integration"),
+            workflow("wf-two", cwd=str(self.root / "other"),
+                     workflow_type="sdk_integration"),
+        ]
+        self.save(state)
+
+        with mock.patch.object(telemetry, "is_enabled", return_value=True):
+            changed, reason = telemetry.report_complete(
+                workflow_type="sdk_integration",
+                project_dir=project,
+                workflow_id="wf-two",
+            )
+
+        workflows = {item["workflow_id"]: item for item in self.load()["workflows"]}
+        self.assertTrue(changed)
+        self.assertEqual(reason, "verification_flag")
+        self.assertEqual(workflows["wf-two"]["status"], "completed")
+        self.assertEqual(workflows["wf-one"]["status"], "in_progress")
+
+    def test_explicit_workflow_id_reports_gate_without_project_lookup(self):
+        state = telemetry_common._empty_state()
+        state["workflows"] = [
+            workflow("wf-one", cwd="C:/project"),
+            workflow("wf-two", cwd="C:/other"),
+        ]
+        self.save(state)
+
+        with mock.patch.object(telemetry, "is_enabled", return_value=True):
+            changed, reason = telemetry.report_gate(
+                "web_delivery",
+                "awaiting_runtime_verification",
+                ["first_frame"],
+                workflow_id="wf-two",
+            )
+
+        workflows = {item["workflow_id"]: item for item in self.load()["workflows"]}
+        self.assertTrue(changed)
+        self.assertEqual(reason, "reported")
+        self.assertEqual(
+            workflows["wf-two"]["completion_detail"]["gate"],
+            "web_delivery",
+        )
+        self.assertIsNone(workflows["wf-one"]["completion_detail"])
+
     def test_project_scoped_report_does_not_use_global_current_session(self):
         state = telemetry_common._empty_state()
         state["workflows"] = [workflow("wf-project", cwd="C:/project")]

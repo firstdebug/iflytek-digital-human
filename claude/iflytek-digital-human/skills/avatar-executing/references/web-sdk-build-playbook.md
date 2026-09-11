@@ -100,8 +100,10 @@ Step 1-2 必须由确定性编排器执行并检查退出码，不能改写成�
 运行前主 agent 必须先 Read `../../avatar-credentials/SKILL.md`、`../../avatar-artifact-download/SKILL.md` 和
 `../../avatar-network-debug/references/auth-verification.md`。这些是实际 Skill/参考读取，不能用状态机内部的 Python 调用冒充 invocation。
 
+若当前 workflowId 已知（来自 Claude Code hook，或 Cursor/Codex 通过 `telemetry.py start` 返回），必须贯穿传入 `--workflow <workflowId>`；没有显式 workflowId 时才允许退回 project 作用域匹配。
+
 ```bash
-python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction "<text|voice|audio>"
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --app-id "<appId>" --scene-id "<sceneId>" --interaction text --workflow "<workflowId>"
 ```
 
 返回 `blocked_missing_sdk` 或其它非零退出码时，保持当前 workflow 进行中并修复确定性阻塞；不得继续宣称项目完成。下载后先读实际 `esm/index.d.ts`，确认默认导出与方法签名：
@@ -210,10 +212,14 @@ avatar.setGlobalParams({
 
 **若任一项失败**：先查 §0 根因表和 §3 锁定表，**不要**盲目改字段试错。
 
-浏览器测试必须通过 `<plugin-root>/tools/web_runtime_evidence.py` 自动生成 `.runtime/web-runtime-evidence.json`。当 `web_delivery.py run` 返回 `awaiting_runtime_verification` 时，只执行返回 JSON 中 `next_action.commands[0]` 的证据采集命令；脚本会打开本轮 URL、点击启动按钮、等待 `connected / stream_start / first_frame`、执行目标交互，并写入 `prepared_at_epoch`、`credential_fingerprint`、`url`、目标交互和浏览器错误。不得由模型判断或手写 JSON 代替脚本采集。完成后再次运行同一个 `web_delivery.py run` 命令，状态机内部才允许执行最终 gate 和完成上报：
+浏览器测试必须通过 `<plugin-root>/tools/web_runtime_evidence.py` 自动生成 `.runtime/web-runtime-evidence.json`。当 `web_delivery.py run` 返回 `awaiting_runtime_verification` 时，只执行返回 JSON 中 `next_action.commands[0]` 的证据采集命令；脚本会打开本轮 URL、点击启动按钮、等待 `connected / stream_start / first_frame`、执行文本交互，并写入 `prepared_at_epoch`、`credential_fingerprint`、`project_fingerprint`、`url`、目标交互和浏览器错误。不得由模型判断或手写 JSON 代替脚本采集。
+
+自动 evidence 的目标是证明“虚拟人能出现并能通过文本链路回话”。语音、麦克风、录音、全双工不走无人自动化；如用户要求这些能力，必须单独询问并安排人工/真机验证，不能把 text evidence 包装成语音验证。
+
+完成后再次运行同一个 `web_delivery.py run` 命令（保留同一个 `--workflow`），状态机内部才允许执行最终 gate 和完成上报：
 
 ```bash
-python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --interaction "<text|voice|audio>"
+python "<plugin-root>/tools/web_delivery.py" run --project "<project>" --interaction text --workflow "<workflowId>"
 ```
 
 命中上述鉴权拒绝时，即使 `connected`、首帧或交互字段为 true，最终门禁也必须先返回
