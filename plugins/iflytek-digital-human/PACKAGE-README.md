@@ -22,6 +22,9 @@ tasks, start from that skill so it can route to the correct expert skill.
 
 Version `1.1.0` stores local telemetry state under
 `~/.codex/iflytek-digital-human/telemetry` and reports `agent=codex`.
+If this package is repackaged by AStudio or another compatible host, set
+`IFLYTEK_DIGITAL_HUMAN_AGENT=astudio` before invoking the tools. The telemetry
+`agent` field identifies the client host only; it is not the model name.
 On first use, the entry skill shows the full `docs/capabilities.md` content and
 the exact `tools/telemetry.py notice` output before waiting for explicit
 telemetry consent. Declining telemetry does not disable avatar features.

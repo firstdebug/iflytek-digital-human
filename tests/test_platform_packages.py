@@ -47,7 +47,7 @@ def load_module(path, name):
 
 
 class PlatformPackageTests(unittest.TestCase):
-    def run_telemetry(self, platform, home, *args):
+    def run_telemetry(self, platform, home, *args, extra_env=None):
         root = PACKAGES[platform]
         env = os.environ.copy()
         env["CURSOR_HOME" if platform == "cursor" else "CODEX_HOME"] = str(home)
@@ -55,6 +55,8 @@ class PlatformPackageTests(unittest.TestCase):
         env["IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH"] = str(
             home / "gate-consent.json"
         )
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(
             [sys.executable, str(root / "tools" / "telemetry.py"), *args],
             cwd=str(root), env=env, check=True, text=True,
@@ -133,6 +135,48 @@ class PlatformPackageTests(unittest.TestCase):
                         f"telemetry_common_version_override_{platform}",
                     )
                     self.assertEqual(module.plugin_version(), "9.9.9-test")
+
+    def test_agent_name_can_be_overridden_for_repackaged_agents(self):
+        for platform, root in ALL_RUNTIME_PACKAGES.items():
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                env = {
+                    "IFLYTEK_DIGITAL_HUMAN_AGENT": "astudio",
+                    "IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH": str(
+                        Path(temp) / "gate-consent.json"
+                    ),
+                }
+                if platform == "cursor":
+                    env["CURSOR_HOME"] = str(Path(temp) / "cursor-home")
+                if platform == "codex":
+                    env["CODEX_HOME"] = str(Path(temp) / "codex-home")
+                with mock.patch.dict("os.environ", env, clear=True), \
+                        mock.patch("pathlib.Path.home", return_value=Path(temp)):
+                    module = load_module(
+                        root / "tools" / "telemetry_common.py",
+                        f"telemetry_common_agent_override_{platform}",
+                    )
+                    self.assertEqual(module.AGENT_NAME, "astudio")
+
+    def test_astudio_environment_marker_overrides_package_default(self):
+        for platform, root in ALL_RUNTIME_PACKAGES.items():
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                env = {
+                    "ASTUDIO_SESSION_ID": "unit-test",
+                    "IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH": str(
+                        Path(temp) / "gate-consent.json"
+                    ),
+                }
+                if platform == "cursor":
+                    env["CURSOR_HOME"] = str(Path(temp) / "cursor-home")
+                if platform == "codex":
+                    env["CODEX_HOME"] = str(Path(temp) / "codex-home")
+                with mock.patch.dict("os.environ", env, clear=True), \
+                        mock.patch("pathlib.Path.home", return_value=Path(temp)):
+                    module = load_module(
+                        root / "tools" / "telemetry_common.py",
+                        f"telemetry_common_astudio_marker_{platform}",
+                    )
+                    self.assertEqual(module.AGENT_NAME, "astudio")
 
     def test_marketplaces_use_new_plugin_identity(self):
         claude = json.loads(
@@ -303,6 +347,24 @@ class PlatformPackageTests(unittest.TestCase):
                     "status": "skipped", "reason": "disabled"})
                 self.assertFalse(
                     (home / PLUGIN_NAME / "telemetry" / "state.json").exists())
+
+    def test_explicit_lifecycle_records_overridden_agent_name(self):
+        for platform in PACKAGES:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                home = Path(temp)
+                project = home / "project"
+                project.mkdir()
+                env = {"IFLYTEK_DIGITAL_HUMAN_AGENT": "astudio"}
+                self.run_telemetry(platform, home, "consent", "--accept",
+                                   extra_env=env)
+                started = json.loads(self.run_telemetry(
+                    platform, home, "start", "--project", str(project),
+                    extra_env=env))
+                self.assertTrue(started["workflowId"].startswith("wf_astudio-"))
+                state_path = home / PLUGIN_NAME / "telemetry" / "state.json"
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                self.assertEqual(state["workflows"][0]["agent"], "astudio")
+                self.assertEqual(state["invocations"][0]["agent"], "astudio")
 
     def test_consent_creates_and_validates_gate_credential(self):
         for platform in PACKAGES:

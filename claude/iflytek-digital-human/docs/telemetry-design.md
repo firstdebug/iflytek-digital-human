@@ -65,6 +65,7 @@
 |---|---|---|---|---|
 | `workflow_id` | varchar(64) | ✓ | 工作流唯一标识 | 首次由 Claude Code session_id 生成；跨会话接续时保持不变。<br>客户端生成，服务端据此幂等 |
 | `workflow_type` | varchar(64) | | 工作流类型 | `sdk_integration` / `web_template` / `live_streaming` /<br>`webapi_protocol` / `knowledge_base` / `troubleshoot` /<br>`credentials_setup` / `model_config`。<br>根据首次命中的 skill 推断，可能为空（纯浏览） |
+| `agent` | varchar(32) | ✓ | 客户端来源 | 默认来自当前分发包（`claude` / `cursor` / `codex`）；可用 `IFLYTEK_DIGITAL_HUMAN_AGENT` 覆盖。AStudio 等兼容宿主复用包时应上报宿主名。该字段不表示模型名称 |
 | `anonymous_id` | varchar(64) | ✓ | 匿名设备标识 | Windows MachineGuid SHA-256 前 16 位（`anon_` 前缀）。<br>不可反推，跨应用追踪能力已断 |
 | `xfyun_user_id` | varchar(64) | | 讯飞账号哈希 | 用户登录讯飞开放平台后，从凭据文件读 appId SHA-256<br>前 16 位（`xf_` 前缀）。未登录为 NULL |
 | `started_at` | datetime | ✓ | 工作流开始时间 | UTC，精确到毫秒。客户端第一次建行时写入，<br>用于判定产物 mtime 是否晚于开始时间 |

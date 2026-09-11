@@ -14,9 +14,13 @@
 
 仓库根目录的 `.cursor-plugin/plugin.json` 会把 Cursor 组件指向 `cursor/skills/` 和 `cursor/agents/`。导入后可在 Cursor 的 `Customize` -> `Plugins` 或 `Customize` -> `Skills` 中检查是否已启用。
 
+如果这个适配包被 AStudio 或其他兼容 Agent 复用，启动工具前设置
+`IFLYTEK_DIGITAL_HUMAN_AGENT=astudio`（或目标宿主名）。统计上报的 `agent`
+字段只表示客户端来源，不表示当前使用的模型。
+
 ## 直接使用包目录
 
-如果不使用 Marketplace，也可以将本目录中的 `skills/` 复制到目标项目的 `.cursor/skills/`，或复制到用户目录 `~/.cursor/skills/`。入口 Skill 为 `avatar-workflow-entry`。首次调用时，入口会先展示 `docs/capabilities.md` 和 `tools/telemetry.py notice` 的完整声明，再等待用户明确同意或拒绝使用统计；拒绝不影响功能。本地遥测状态保存在 `~/.cursor/iflytek-digital-human/telemetry`，报文 `agent` 默认为 `cursor`。
+如果不使用 Marketplace，也可以将本目录中的 `skills/` 复制到目标项目的 `.cursor/skills/`，或复制到用户目录 `~/.cursor/skills/`。入口 Skill 为 `avatar-workflow-entry`。首次调用时，入口会先展示 `docs/capabilities.md` 和 `tools/telemetry.py notice` 的完整声明，再等待用户明确同意或拒绝使用统计；拒绝不影响功能。本地遥测状态保存在 `~/.cursor/iflytek-digital-human/telemetry`，报文 `agent` 默认为 `cursor`，但可由 `IFLYTEK_DIGITAL_HUMAN_AGENT` 覆盖。
 
 ## 运行依赖
 

@@ -65,10 +65,48 @@ GATE_CONSENT_PATH = Path(os.environ.get(
 SCHEMA_VERSION = '2.0-json'
 GATE_SCHEMA_VERSION = 1
 NOTICE_VERSION = '2.2'
-AGENT_NAME = 'cursor'
+DEFAULT_AGENT_NAME = 'cursor'
 SESSION_REQUEST_METRICS = ('platform_ok', 'telemetry_post',
                            'telemetry_post_fail')
 MAX_SESSION_REQUEST_STATS = 20
+
+
+def _normalize_agent_name(value):
+    if not value:
+        return None
+    name = str(value).strip().lower().replace(' ', '-').replace('_', '-')
+    aliases = {
+        'claude-code': 'claude',
+        'claude': 'claude',
+        'cursor-ide': 'cursor',
+        'cursor': 'cursor',
+        'codex-desktop': 'codex',
+        'codex': 'codex',
+        'aistudio': 'astudio',
+        'ai-studio': 'astudio',
+        'astudio': 'astudio',
+        'a-studio': 'astudio',
+    }
+    name = aliases.get(name, name)
+    if re.fullmatch(r'[a-z][a-z0-9-]{0,31}', name):
+        return name
+    return None
+
+
+def detect_agent_name(default_name):
+    for key in ('IFLYTEK_DIGITAL_HUMAN_AGENT',
+                'AVATAR_PLATFORM_AGENT'):
+        agent = _normalize_agent_name(os.environ.get(key))
+        if agent:
+            return agent
+
+    env_keys = {key.upper() for key in os.environ}
+    if any('ASTUDIO' in key or 'AISTUDIO' in key for key in env_keys):
+        return 'astudio'
+    return default_name
+
+
+AGENT_NAME = detect_agent_name(DEFAULT_AGENT_NAME)
 
 #获取当前时间
 def now_iso():
