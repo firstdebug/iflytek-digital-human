@@ -76,7 +76,7 @@
 | `completion_confidence` | varchar(16) | | 完成证据的可信度 | `high` — 机器验证的产物（APK ZIP 校验 / 7 层验证）<br>`medium` — 有交付物 ID，但本地没实物<br>NULL — 未完成或判据为 `none` |
 | `completion_detail` | varchar(1000) | | 命中的产物证据 | JSON 文本，记录具体证据。例如：<br>`{"apk": "path/to.apk", "size": 12345}`<br>`{"template_url": "https://..."}`<br>服务端截断到 1000 字符 |
 | `os` | varchar(32) | | 操作系统 | `win32` / `darwin` / `linux`，来自 Python `sys.platform` |
-| `plugin_version` | varchar(32) | | 插件版本 | 客户端硬编码，当前为 `1.0.0` |
+| `plugin_version` | varchar(32) | | 插件版本 | 运行时按插件 manifest/package.json 解析；支持 `IFLYTEK_DIGITAL_HUMAN_PLUGIN_VERSION` 显式覆盖，解析失败时使用包内兜底版本 |
 | `schema_version` | varchar(16) | ✓ | 上报协议版本 | 当前为 `1.2`，用于后续兼容处理 |
 | `report_time` | datetime | ✓ | 服务端接收时间 | 服务端写入，与 `started_at` 的差距反映上报延迟 |
 | `create_time` | datetime | ✓ | 数据库创建时间 | 服务端写入 |
@@ -385,7 +385,7 @@ else:
       "completionConfidence": "high",
       "completionDetail": "{\"apk\": \"...\", \"size\": 12589327}",
       "os": "win32",
-      "pluginVersion": "1.0.0"
+      "pluginVersion": "1.1.0"
     }
   ],
   "invocations": [
@@ -555,7 +555,7 @@ else:
       "linux": 5
     },
     "byPluginVersion": {
-      "1.0.0": 85
+      "1.1.0": 85
     }
   }
 }

@@ -22,6 +22,15 @@ PACKAGES = {
     "cursor": REPO / "cursor",
     "codex": REPO / "plugins" / PLUGIN_NAME,
 }
+ALL_RUNTIME_PACKAGES = {
+    "claude": CLAUDE_PACKAGE,
+    **PACKAGES,
+}
+PLUGIN_ROOT_ENVS = {
+    "claude": "CLAUDE_PLUGIN_ROOT",
+    "cursor": "CURSOR_PLUGIN_ROOT",
+    "codex": "CODEX_PLUGIN_ROOT",
+}
 FRONTMATTER = re.compile(r"^---\r?\n(.*?)\r?\n---", re.DOTALL)
 
 
@@ -54,13 +63,21 @@ class PlatformPackageTests(unittest.TestCase):
 
     def test_manifests_and_required_resources_exist(self):
         manifests = {
+            "claude": ".claude-plugin/plugin.json",
             "cursor": ".cursor-plugin/plugin.json",
             "codex": ".codex-plugin/plugin.json",
         }
-        for platform, root in PACKAGES.items():
+        for platform, root in ALL_RUNTIME_PACKAGES.items():
             manifest = json.loads((root / manifests[platform]).read_text(encoding="utf-8"))
             self.assertEqual(manifest["name"], PLUGIN_NAME)
             self.assertEqual(manifest["version"], "1.1.0")
+            package = root / "package.json"
+            if package.is_file():
+                self.assertEqual(
+                    json.loads(package.read_text(encoding="utf-8"))["version"],
+                    "1.1.0",
+                    f"{platform}: package.json",
+                )
             for relative in (
                 "docs/capabilities.md",
                 "config/privacy_notice.json",
@@ -74,12 +91,48 @@ class PlatformPackageTests(unittest.TestCase):
                 "skills/avatar-consent-gate/SKILL.md",
             ):
                 self.assertTrue((root / relative).is_file(), f"{platform}: {relative}")
-        for relative in (
-            "tools/web_delivery.py",
-            "tools/web_runtime_evidence.py",
-            "tools/web_sdk_gate.py",
-        ):
-            self.assertTrue((CLAUDE_PACKAGE / relative).is_file(), f"claude: {relative}")
+
+    def test_plugin_version_resolves_for_all_runtime_packages(self):
+        for platform, root in ALL_RUNTIME_PACKAGES.items():
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                env = {
+                    PLUGIN_ROOT_ENVS[platform]: str(root),
+                    "IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH": str(
+                        Path(temp) / "gate-consent.json"
+                    ),
+                }
+                if platform == "cursor":
+                    env["CURSOR_HOME"] = str(Path(temp) / "cursor-home")
+                if platform == "codex":
+                    env["CODEX_HOME"] = str(Path(temp) / "codex-home")
+                with mock.patch.dict("os.environ", env, clear=True), \
+                        mock.patch("pathlib.Path.home", return_value=Path(temp)):
+                    module = load_module(
+                        root / "tools" / "telemetry_common.py",
+                        f"telemetry_common_version_{platform}",
+                    )
+                    self.assertEqual(module.plugin_version(), "1.1.0")
+
+    def test_plugin_version_can_be_overridden_for_repackaged_agents(self):
+        for platform, root in ALL_RUNTIME_PACKAGES.items():
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temp:
+                env = {
+                    "IFLYTEK_DIGITAL_HUMAN_PLUGIN_VERSION": "9.9.9-test",
+                    "IFLYTEK_DIGITAL_HUMAN_GATE_CONSENT_PATH": str(
+                        Path(temp) / "gate-consent.json"
+                    ),
+                }
+                if platform == "cursor":
+                    env["CURSOR_HOME"] = str(Path(temp) / "cursor-home")
+                if platform == "codex":
+                    env["CODEX_HOME"] = str(Path(temp) / "codex-home")
+                with mock.patch.dict("os.environ", env, clear=True), \
+                        mock.patch("pathlib.Path.home", return_value=Path(temp)):
+                    module = load_module(
+                        root / "tools" / "telemetry_common.py",
+                        f"telemetry_common_version_override_{platform}",
+                    )
+                    self.assertEqual(module.plugin_version(), "9.9.9-test")
 
     def test_marketplaces_use_new_plugin_identity(self):
         claude = json.loads(

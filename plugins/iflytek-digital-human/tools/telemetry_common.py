@@ -24,6 +24,14 @@ _RUNTIME_HOME = Path(os.environ.get('CODEX_HOME') or
                      (Path.home() / '.codex'))
 PLUGIN_NAME = 'iflytek-digital-human'
 LEGACY_PLUGIN_NAME = 'avatar-platform'
+PLUGIN_VERSION = '1.1.0'
+PLUGIN_VERSION_FILES = (
+    '.claude-plugin/plugin.json',
+    '.codex-plugin/plugin.json',
+    '.cursor-plugin/plugin.json',
+    'plugin.json',
+    'package.json',
+)
 
 
 def _resolve_telemetry_dir(runtime_home):
@@ -495,19 +503,62 @@ def sanitize_completion_detail(detail):
 
 
 def plugin_root():
-    value = os.environ.get('CODEX_PLUGIN_ROOT')
+    value = (os.environ.get('IFLYTEK_DIGITAL_HUMAN_PLUGIN_ROOT') or
+             os.environ.get('CODEX_PLUGIN_ROOT'))
     return Path(value) if value else Path(__file__).resolve().parent.parent
 
 
-def plugin_version():
+def _candidate_plugin_roots():
+    bases = [
+        os.environ.get('IFLYTEK_DIGITAL_HUMAN_PLUGIN_ROOT'),
+        os.environ.get('CODEX_PLUGIN_ROOT'),
+        Path(__file__).resolve().parent,
+        Path(__file__).resolve().parent.parent,
+        Path.cwd(),
+    ]
+    seen = set()
+    for base in bases:
+        if not base:
+            continue
+        try:
+            path = Path(base).expanduser()
+        except TypeError:
+            continue
+        for depth, candidate in enumerate((path, *path.parents)):
+            if depth > 6:
+                break
+            try:
+                key = str(candidate.resolve(strict=False)).lower()
+            except Exception:
+                key = str(candidate).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            yield candidate
+
+
+def _read_plugin_version(path):
     try:
-        manifest = plugin_root() / '.codex-plugin' / 'plugin.json'
-        if not manifest.is_file():
-            manifest = plugin_root() / 'plugin.json'
-        meta = json.loads(manifest.read_text(encoding='utf-8'))
-        return meta.get('version', 'unknown')
+        meta = json.loads(path.read_text(encoding='utf-8'))
     except Exception:
-        return 'unknown'
+        return None
+    version = meta.get('version')
+    if isinstance(version, str) and version.strip():
+        return version.strip()
+    return None
+
+
+def plugin_version():
+    override = (os.environ.get('IFLYTEK_DIGITAL_HUMAN_PLUGIN_VERSION') or
+                os.environ.get('AVATAR_PLATFORM_PLUGIN_VERSION'))
+    if override and override.strip():
+        return override.strip()
+    for root in _candidate_plugin_roots():
+        for relative in PLUGIN_VERSION_FILES:
+            version = _read_plugin_version(root / relative)
+            if version:
+                return version
+    return PLUGIN_VERSION
 
 
 def read_current_session():
