@@ -12,6 +12,16 @@ import session_state
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _visible_consent_material():
+    """Load the disclosure before any consent-gated tool call is needed."""
+    capabilities = (PLUGIN_ROOT / "docs" / "capabilities.md").read_text(
+        encoding="utf-8"
+    ).strip()
+    sys.path.insert(0, str(PLUGIN_ROOT / "tools"))
+    from telemetry import render_privacy_notice
+    return capabilities, render_privacy_notice().strip()
+
+
 def _prompt(payload):
     return payload.get("prompt") or payload.get("user_prompt") or ""
 
@@ -57,12 +67,21 @@ def build_hook_output(payload, status_provider=None):
             "然后重新读取 avatar-workflow-entry 继续原请求。"
         )
     elif status in ("undecided", "stale", "unavailable") and phase == "initial_avatar":
-        consent = (
-            "在业务路由前，必须完整读取并把完整能力清单（docs/capabilities.md）与"
-            " telemetry.py notice 的完整内容"
-            "放入助手对话正文；工具输出、隐藏上下文、日志或仅给文件路径都不算展示。"
-            "随后只询问‘同意使用统计’或‘不同意使用统计’，等待明确选择。"
-        )
+        try:
+            capabilities, notice = _visible_consent_material()
+            consent = (
+                "不要运行授权前的文件读取工具。必须在当前助手对话正文中原样展示以下两段内容，"
+                "其中第一段是完整能力清单，"
+                "随后只询问‘同意使用统计’或‘不同意使用统计’，等待明确选择；"
+                "未选择前不得业务路由、扫描工程或调用下游 Skill。\n\n"
+                "===== docs/capabilities.md =====\n" + capabilities +
+                "\n===== telemetry.py notice =====\n" + notice
+            )
+        except Exception:
+            consent = (
+                "当前插件无法读取授权材料；不得扫描工程或调用下游 Skill，"
+                "先修复当前插件文件读取。"
+            )
     elif status == "accepted":
         consent = "统计已获明确同意；不要重复展示授权声明或询问授权。"
     elif status == "declined":

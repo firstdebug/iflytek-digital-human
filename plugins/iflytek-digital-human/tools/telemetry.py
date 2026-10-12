@@ -31,6 +31,15 @@ WORKFLOW_TYPES = (
 SKILL_NAME_RE = re.compile(r'^avatar-[a-z0-9-]{1,120}$')
 
 
+def _configure_utf8_stdio():
+    """Keep CLI disclosure text readable on Windows hosts using a GBK default."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
+
+
 def _flush_after_change(changed):
     if changed:
         spawn_uploader(force=True)
@@ -476,6 +485,7 @@ def show_stats():
 
 
 def main():
+    _configure_utf8_stdio()
     parser = argparse.ArgumentParser(prog='telemetry.py')
     sub = parser.add_subparsers(dest='cmd')
     start = sub.add_parser('start')

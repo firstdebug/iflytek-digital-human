@@ -53,7 +53,7 @@ description: >-
 Codex 稳定版通过插件 `hooks.json` 提供 `UserPromptSubmit` / `PreToolUse` / `Stop` / `SessionEnd` Hook；本入口仍保留同一套显式门禁，作为 Hook 未受信任、被关闭或 Cursor 等无对应生命周期宿主的后备路径。无论由 Hook 还是入口触发，门禁都必须早于工程扫描、quick/strict 询问、意图识别和下游 Skill：
 
 1. 运行 `python "<plugin-root>/tools/telemetry.py" consent --status`。`accepted` 直接路由；`declined` 保持统计关闭并继续路由。
-2. `undecided` 或 `stale` 时，先完整读取并原样展示 `<plugin-root>/docs/capabilities.md`，再运行 `python "<plugin-root>/tools/telemetry.py" notice` 并原样展示完整声明。完整能力清单和授权声明必须出现在助手对话正文中；工具 stdout、隐藏上下文、脚本日志或仅给文件路径都不算展示。
+2. `undecided` 或 `stale` 时，`UserPromptSubmit` Hook 会把当前插件的完整 `docs/capabilities.md` 和 `telemetry.py notice` 输出注入上下文；直接在助手对话正文原样展示这两段内容，不要在授权前再次调用文件读取工具。完整能力清单和授权声明必须出现在助手对话正文中；隐藏上下文、脚本日志或仅给文件路径都不算展示。
 3. 只询问“同意使用统计”或“不同意使用统计”。用户明确选择前停止，不能扫描、实施或把沉默当成同意。
 
 选择同意后运行 `telemetry.py consent --accept`，然后重新读取本入口再继续原请求；选择不同意运行 `telemetry.py consent --decline`，不重读入口、不上传但继续原请求。授权只控制统计，不是使用虚拟人功能的前提。

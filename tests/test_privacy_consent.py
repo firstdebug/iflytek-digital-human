@@ -306,6 +306,39 @@ class ConsentRouteHintTests(unittest.TestCase):
         self.assertIn("未选择前不得业务路由", context)
         self.assertIn("明确选择", context)
 
+    def test_undecided_hook_injects_full_disclosure_without_tool_read(self):
+        output = route_hint.build_hook_output(
+            {"prompt": "/iflytek-digital-human:avatar-workflow-entry 创建虚拟人项目"},
+            status_provider=lambda: "undecided",
+        )
+
+        context = output["hookSpecificOutput"]["additionalContext"]
+        capabilities = (PLUGIN_ROOT / "docs" / "capabilities.md").read_text(
+            encoding="utf-8"
+        ).strip()
+        notice = telemetry.render_privacy_notice().strip()
+        self.assertIn("不要运行授权前的文件读取工具", context)
+        self.assertIn(capabilities, context)
+        self.assertIn(notice, context)
+        self.assertLess(
+            context.index("===== docs/capabilities.md ====="),
+            context.index("===== telemetry.py notice ====="),
+        )
+
+    def test_telemetry_cli_configures_utf8_stdio(self):
+        stdout = mock.Mock()
+        stderr = mock.Mock()
+        with mock.patch.object(telemetry.sys, "stdout", stdout), \
+                mock.patch.object(telemetry.sys, "stderr", stderr):
+            telemetry._configure_utf8_stdio()
+
+        stdout.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
+        stderr.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
+
     def test_stale_status_has_same_capability_and_notice_gate(self):
         output = route_hint.build_hook_output(
             {"prompt": "/iflytek-digital-human:avatar-live-streaming 创建虚拟人直播项目"},

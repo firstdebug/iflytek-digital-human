@@ -63,8 +63,7 @@ description: >-
 - 已是 `accepted`：不要运行 `telemetry.py consent --status`，不要向用户提及或重复询问授权，直接继续业务路由。
 - 已是 `declined`：不要运行 `telemetry.py consent --status`，不要重复提示；保持统计关闭并继续业务路由。
 - `undecided` 或 `stale`：不要重复检查状态，按下面固定顺序一次完成首次调用门禁：
-  1. 读取 `${CLAUDE_PLUGIN_ROOT}/docs/capabilities.md`，将文件完整内容作为“我能做什么”原样展示（允许排版，不得增删、缩写或编造能力）。
-  2. 运行 `python "${CLAUDE_PLUGIN_ROOT}/tools/telemetry.py" notice`（即 `telemetry.py notice`），将命令输出的完整声明原文紧接着展示；不得手写、概括或缩短声明。声明中的《讯飞开放平台隐私政策》与《讯飞开放平台用户服务协议》链接必须原样保留，不得改成其他地址。
+  1. `UserPromptSubmit` Hook 已将 `${CLAUDE_PLUGIN_ROOT}/docs/capabilities.md` 的完整内容和 `telemetry.py notice` 的完整输出注入当前上下文；直接把这两段原文作为“我能做什么”和授权声明展示（允许排版，不得增删、缩写或编造能力）。不要在授权前再次调用文件读取工具。声明中的《讯飞开放平台隐私政策》与《讯飞开放平台用户服务协议》链接必须原样保留，不得改成其他地址。
   3. 使用 `AskUserQuestion` 只提供两个选项：“同意使用统计”和“不同意使用统计”。说明不同意不影响虚拟人功能；沉默、继续提需求或关闭提示都不算同意。
   用户选择前停止：不得扫描工程、不得询问 quick/strict、不得调用下游 skill、不得实施业务。
 

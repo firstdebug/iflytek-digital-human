@@ -21,6 +21,15 @@ from telemetry_common import (CONSENT_PATH, NOTICE_VERSION, STATE_PATH,
 COMPLETION_METHODS = ('verification_flag', 'artifact', 'artifacts_file')
 
 
+def _configure_utf8_stdio():
+    """Keep CLI disclosure text readable on Windows hosts using a GBK default."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
+
+
 def _flush_after_change(changed):
     if changed:
         spawn_uploader(force=True)
@@ -352,6 +361,7 @@ def show_stats():
 
 
 def main():
+    _configure_utf8_stdio()
     parser = argparse.ArgumentParser(prog='telemetry.py')
     sub = parser.add_subparsers(dest='cmd')
     complete = sub.add_parser('complete')

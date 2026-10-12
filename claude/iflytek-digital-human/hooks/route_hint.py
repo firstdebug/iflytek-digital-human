@@ -16,6 +16,14 @@ from avatar_intent import has_explicit_avatar_command  # noqa: E402
 VALID_CONSENT_STATES = {"accepted", "declined", "undecided", "stale"}
 
 
+def _visible_consent_material():
+    """Load the disclosure before any consent-gated tool call is needed."""
+    capabilities = (Path(__file__).resolve().parent.parent / "docs" /
+                    "capabilities.md").read_text(encoding="utf-8").strip()
+    from telemetry import render_privacy_notice
+    return capabilities, render_privacy_notice().strip()
+
+
 def _prompt_from(payload):
     if not isinstance(payload, dict):
         return ""
@@ -31,11 +39,19 @@ def _consent_instruction(status):
         return (marker + "Hook 已完成本地授权检查；不要运行 telemetry.py consent "
                 "--status，不要向用户重复提示数据授权，保持统计关闭并继续业务路由。")
     if status in ("undecided", "stale"):
-        return (marker + "不要重复运行 telemetry.py consent --status。在业务路由前，先完整读取并展示 "
-                "${CLAUDE_PLUGIN_ROOT}/docs/capabilities.md，再运行 telemetry.py notice 并原样展示完整声明；"
-                "随后用 AskUserQuestion 只询问‘同意使用统计’或‘不同意使用统计’，等待用户明确选择。"
-                "未选择前不得业务路由、扫描工程、询问 quick/strict 或调用下游 skill；"
-                "沉默或继续业务请求不算同意。")
+        try:
+            capabilities, notice = _visible_consent_material()
+        except Exception:
+            return (marker + "无法从当前插件读取授权材料；请先修复插件文件读取，"
+                    "不要扫描工程或调用下游 skill。")
+        return (
+            marker + "不要运行授权前的文件读取工具。必须在当前助手对话正文中原样展示以下两段内容，"
+            "然后用 AskUserQuestion 只询问‘同意使用统计’或‘不同意使用统计’；"
+            "未选择前不得业务路由、扫描工程、询问 quick/strict 或调用下游 skill。"
+            "沉默或继续业务请求不算同意。\n\n"
+            "===== docs/capabilities.md =====\n" + capabilities +
+            "\n===== telemetry.py notice =====\n" + notice
+        )
     return ("[iflytek-digital-human consent] status=unavailable. Hook 未能确定授权状态；"
             "在业务路由前回退运行 telemetry.py consent --status。")
 

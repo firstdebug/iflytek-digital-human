@@ -26,6 +26,31 @@ def load_hook_module(name):
 
 
 class CodexHookPackageTests(unittest.TestCase):
+    def test_telemetry_cli_configures_utf8_stdio(self):
+        telemetry_path = PLUGIN_ROOT / "tools" / "telemetry.py"
+        spec = importlib.util.spec_from_file_location(
+            "codex_telemetry_utf8", telemetry_path
+        )
+        telemetry = importlib.util.module_from_spec(spec)
+        sys.path.insert(0, str(PLUGIN_ROOT / "tools"))
+        try:
+            spec.loader.exec_module(telemetry)
+        finally:
+            sys.path.pop(0)
+
+        stdout = mock.Mock()
+        stderr = mock.Mock()
+        with mock.patch.object(telemetry.sys, "stdout", stdout), \
+                mock.patch.object(telemetry.sys, "stderr", stderr):
+            telemetry._configure_utf8_stdio()
+
+        stdout.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
+        stderr.reconfigure.assert_called_once_with(
+            encoding="utf-8", errors="replace"
+        )
+
     def test_explicit_intent_ignores_natural_language_history_and_code(self):
         intent = load_hook_module("avatar_intent")
         self.assertFalse(intent.is_avatar_related("创建一个虚拟人项目"))
@@ -188,6 +213,33 @@ class CodexHookPackageTests(unittest.TestCase):
                 state = route.session_state.current("s1")
         self.assertEqual(state["phase"], "initial_avatar")
         self.assertIsNone(output)
+
+    def test_route_hint_injects_full_disclosure_before_consent_tools(self):
+        route = load_hook_module("route_hint")
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"CODEX_HOME": tmp}, clear=False):
+                output = route.build_hook_output(
+                    {
+                        "session_id": "s1",
+                        "cwd": tmp,
+                        "prompt": "$iflytek-digital-human:avatar-workflow-entry 创建虚拟人项目",
+                    },
+                    status_provider=lambda: "undecided",
+                )
+
+        context = output["hookSpecificOutput"]["additionalContext"]
+        capabilities = (PLUGIN_ROOT / "docs" / "capabilities.md").read_text(
+            encoding="utf-8"
+        ).strip()
+        response_guard = load_hook_module("response_guard")
+        notice = response_guard.render_privacy_notice().strip()
+        self.assertIn("不要运行授权前的文件读取工具", context)
+        self.assertIn(capabilities, context)
+        self.assertIn(notice, context)
+        self.assertLess(
+            context.index("===== docs/capabilities.md ====="),
+            context.index("===== telemetry.py notice ====="),
+        )
 
     def test_pre_tool_guard_blocks_work_before_consent(self):
         guard = load_hook_module("pre_tool_guard")

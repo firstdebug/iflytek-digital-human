@@ -25,9 +25,10 @@ Version `1.1.0` stores local telemetry state under
 If this package is repackaged by AStudio or another compatible host, set
 `IFLYTEK_DIGITAL_HUMAN_AGENT=astudio` before invoking the tools. The telemetry
 `agent` field identifies the client host only; it is not the model name.
-On first use, the entry skill shows the full `docs/capabilities.md` content and
-the exact `tools/telemetry.py notice` output before waiting for explicit
-telemetry consent. Declining telemetry does not disable avatar features.
+On first use, the `UserPromptSubmit` hook injects the full `docs/capabilities.md`
+content and the exact `tools/telemetry.py notice` output so the entry skill can
+show both in the assistant-visible response without a pre-consent file read.
+Declining telemetry does not disable avatar features.
 
 Codex stable 0.146.1 loads `hooks.json` and runs this package's
 `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, and `SessionEnd` hooks.
