@@ -24,7 +24,7 @@ _RUNTIME_HOME = Path(os.environ.get('CODEX_HOME') or
                      (Path.home() / '.codex'))
 PLUGIN_NAME = 'iflytek-digital-human'
 LEGACY_PLUGIN_NAME = 'avatar-platform'
-PLUGIN_VERSION = '1.1.0'
+PLUGIN_VERSION = '1.1.1'
 PLUGIN_VERSION_FILES = (
     '.claude-plugin/plugin.json',
     '.codex-plugin/plugin.json',

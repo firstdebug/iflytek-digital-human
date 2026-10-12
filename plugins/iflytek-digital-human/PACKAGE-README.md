@@ -20,7 +20,7 @@ repository. It includes the runtime resources required by its Skills.
 The entry skill is `avatar-workflow-entry`. For virtual-human or digital-human
 tasks, start from that skill so it can route to the correct expert skill.
 
-Version `1.1.0` stores local telemetry state under
+Version `1.1.1` stores local telemetry state under
 `~/.codex/iflytek-digital-human/telemetry` and reports `agent=codex`.
 If this package is repackaged by AStudio or another compatible host, set
 `IFLYTEK_DIGITAL_HUMAN_AGENT=astudio` before invoking the tools. The telemetry
