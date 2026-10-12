@@ -41,6 +41,8 @@ if sys.platform == "win32":
         pass
 
 import json
+import os
+import subprocess
 import xfyun_common as xc
 
 # ==================== API 端点 ====================
@@ -110,33 +112,27 @@ def open_urls(urls, hint=""):
         print(f"     {label}: {url}")
 
     try:
-        from playwright.sync_api import sync_playwright
-        cookies = xc.load_cookies()
-        if not cookies:
-            print("[警告] 未找到登录 Cookie，浏览器打开后需要重新登录")
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xfyun_open_browser.py")
+        options = {
+            "cwd": os.path.dirname(helper),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if sys.platform == "win32":
+            options["creationflags"] = (
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        else:
+            options["start_new_session"] = True
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
-            context = browser.new_context()
-
-            if cookies:
-                pw_cookies = []
-                for name, value in cookies.items():
-                    pw_cookies.append({
-                        "name": name,
-                        "value": value,
-                        "domain": ".xfyun.cn",
-                        "path": "/"
-                    })
-                context.add_cookies(pw_cookies)
-
-            for _, url in urls:
-                page = context.new_page()
-                page.goto(url)
-
-            print(f"[OK] 浏览器已打开 {len(urls)} 个标签页（已注入登录态）")
-            print("     浏览器将保持打开，脚本立即退出")
-            # 不等待，打开后立即退出（浏览器保持运行）
+        subprocess.Popen(
+            [sys.executable, helper, json.dumps(urls, ensure_ascii=False)],
+            **options,
+        )
+        print(f"[OK] 浏览器启动任务已分离，将打开 {len(urls)} 个标签页")
+        print("     浏览器关闭后后台进程会自动退出")
     except ImportError:
         print("[警告] playwright 未安装，请手动访问上述链接")
     except Exception:
