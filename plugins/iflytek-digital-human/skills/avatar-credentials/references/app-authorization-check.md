@@ -95,8 +95,10 @@ Content-Type: application/json
    - 选了数字人直播 → **标准产品**(appType=2),订阅时勾选【数字人直播】
    - 选了 SDK/WebAPI → **接口能力**(appType=1)
    - 需要大模型对话功能 → 打开 **大模型对话开关**(`LLM_DIALOG_NUM` / `LLM_DOC_NUM` / `LLM_TOKENS_NUM`)
-4. 给订阅链接:[订阅页面](https://virtual-man.xfyun.cn/console/applications/subscribe)
-5. **等待用户操作**:告诉他订阅后回来重新运行,任务暂停
+4. 根据需求在插件根目录调用 `python tools/xfyun_subscription.py 1` 或 `python tools/xfyun_subscription.py 2`。
+   该接口当前不需要验证码；默认请求体由脚本生成，不能自行补 captcha 字段。
+5. `appType=1` 提交后平台自动审核，可继续查询应用和凭据；`appType=2` 提交后仍需等待运营审核，
+   审核通过前暂停 Web 模板/数字人产品创建。必要时再提供[订阅页面](https://virtual-man.xfyun.cn/console/applications/subscribe)。
 
 ---
 
@@ -108,7 +110,7 @@ Content-Type: application/json
 
 **处理**:
 - 提示:"应用「{appName}」已过期(isEffect=false),无法使用。"
-- "需要重新订阅或续费。访问[订阅页面](https://virtual-man.xfyun.cn/console/applications/subscribe)处理。"
+- "需要重新订阅或续费。按目标接入方式调用 `xfyun_subscription.py 1/2`；也可访问[订阅页面](https://virtual-man.xfyun.cn/console/applications/subscribe)处理。"
 - 如果有其他有效应用,继续用其他的;全部过期则停止任务
 
 #### 2.2 授权不足
@@ -126,8 +128,7 @@ Content-Type: application/json
 - 提示:"你的应用「{appName}」(appId={appId})缺少大模型对话授权,无法使用大模型对话功能。"
 - "当前授权列表:{列出 auths 里的 authKey}"
 - "需要重新创建一个应用,订阅时记得打开 **大模型对话开关**(LLM_DIALOG_NUM / LLM_DOC_NUM / LLM_TOKENS_NUM)。"
-- 给订阅链接:[订阅页面](https://virtual-man.xfyun.cn/console/applications/subscribe)
-- **等待用户操作**:订阅新应用后回来重新运行
+- 按缺失能力调用 `xfyun_subscription.py 1/2` 创建对应产品申请；标准产品提交后等待运营审核，接口产品提交后继续查询状态
 
 ---
 
@@ -177,7 +178,7 @@ def check_app_authorization(cookies_path="xfyun_cookies.json"):
     # 3. 无应用
     if not apps:
         print("❌ 未检测到任何应用")
-        # 询问需求 → 推荐订阅类型 → 给链接
+        # 按需求调用 xfyun_subscription.py 1/2；标准产品等待运营审核
         return None
     
     # 4. 过滤有效应用
@@ -209,7 +210,7 @@ if app:
     # 继续查询场景
     pass
 else:
-    # 停止,等用户订阅
+    # 停止并等待订阅状态更新
     pass
 ```
 

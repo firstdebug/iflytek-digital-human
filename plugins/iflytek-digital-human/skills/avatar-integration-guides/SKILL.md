@@ -27,3 +27,10 @@ description: >-
 
 - 只想快速了解某平台接入形态 → 读对应平台文件
 - 要真正落地可交付工程 → 转 `avatar-executing`，按该平台的 build-playbook 执行
+
+## 产品订阅前置
+
+Web、Android、iOS SDK 接入统一使用接口产品 `appType=1`。如果账号没有有效接口产品，
+先在插件根目录执行 `python tools/xfyun_subscription.py 1`；当前提交不需要验证码，平台自动审核，
+再按平台实际返回查询应用和凭据。Web 模板、PC 助手和数字人直播使用标准产品 `appType=2`，
+提交后必须等待运营审核通过，不能直接进入模板创建。

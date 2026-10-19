@@ -30,9 +30,8 @@ description: >-
 自动完成场景/模板/NLP/交互 4 步配置 + 资产授权，创建后自动发布并给出可访问链接。
 
 **调用时机**:
-- 想快速要一个能直接访问的对话页面（智能客服 / H5 / 大屏）
-- 不想自己搭前端工程，用官方模板即可
-- 已有对话能力的 appId，只差一个前端载体
+- 仅由已显式调用的 `avatar-workflow-entry` 路由，或用户显式调用本 skill 时执行。
+- 不得因为“Web 模板”、智能客服、H5、大屏等关键词自动触发。
 
 **与相关 skill 的区别**:
 - 与 `avatar-executing`（自建前端工程）不同：这里用官方现成模板，零代码
@@ -91,8 +90,8 @@ python tools/xfyun_template.py publish <sceneId> --domain <域名> --expire <毫
 
    **判定**：选一个「appType=2 且有效 且含 Web对话系统」的 appId 才能建模板。
    - 若有符合的 → 用它 create
-   - 若标准产品应用全部过期 → 去控制台续订：https://virtual-man.xfyun.cn/console/applications/
-   - 若账号下只有 appType=1 → 去控制台新建标准产品类应用（需用户手动，可能付费），或改走 SDK 自建工程路线（avatar-executing）
+   - 若标准产品应用全部过期 → 调用 `python tools/xfyun_subscription.py 2` 重新提交标准产品申请；审核通过前停止后续创建
+   - 若账号下只有 appType=1 → 调用 `python tools/xfyun_subscription.py 2` 提交标准产品申请；提交成功后明确等待运营审核，不继续创建模板
 
    **切勿用查场景的结果判断 appType**——那是上一版踩过的坑：默认 `list` 查场景查不到应用类型，导致走到 create 才被硬门禁拦下。
 1. **appId 需有对话能力** — 创建前用 `python tools/xfyun_model_manage.py check <sceneId>` 确认授权

@@ -6,6 +6,30 @@
 tools:
   # ========== 认证与会话 ==========
 
+  - name: create-subscription-order
+    description: 创建讯飞虚拟人订阅申请；appType=1 接口产品自动审核，appType=2 标准产品需等待运营审核
+    type: script
+    path: tools/xfyun_subscription.py
+    input:
+      appType: integer       # 1=接口产品(SDK/WebAPI)，2=标准产品(Web模板/直播)
+      appName: string        # 可选，使用平台默认值
+      appDesc: string        # 可选，使用平台默认值
+      company: string        # 可选，使用平台默认值
+      contact: string        # 可选
+      phone: string           # 可选
+      effectTime: integer     # 可选，毫秒时长
+      sceneNum: integer       # 可选
+      productType: array      # appType=2 可选能力列表
+    output:
+      ok: boolean
+      appType: integer
+      review: string
+      orderId: string
+      status: string
+    security:
+      sensitive_output: false
+    required: false
+
   - name: xfyun-login
     description: 浏览器自动化登录，获取会话 Cookie
     type: script

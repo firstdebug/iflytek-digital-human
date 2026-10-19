@@ -1,12 +1,10 @@
 ---
 name: avatar-workflow-entry
 description: >-
-  【讯飞虚拟人/数字人任务的必经入口 — 任何虚拟人相关请求都必须先调用本 skill 再响应】处理一切与讯飞虚拟人/数字人（xfyun
-  avatar）有关的需求：构建/搭建/做一个虚拟人项目或应用、从零创建/接入虚拟人、把虚拟人集成到
-  web/android/ios、Web对话模板、数字人直播、WebAPI报文接入、语音/文本/音频驱动、配置调整、故障排查，以及"你能做什么/有哪些功能"这类能力询问。本
-  skill 负责意图识别与智能路由，分发到对应子技能。触发词：构建虚拟人、搭建虚拟人、虚拟人项目、创建虚拟人、数字人、虚拟人集成、avatar、avatar
-  SDK、讯飞虚拟人、xfyun、virtual-man、数字人直播、虚拟主播、你能做什么、有哪些功能、功能清单。收到上述任一信号时不要用通用知识直接回答或抛技术选型问题（如
-  Unity/Three.js/2D-3D），必须先走本入口路由。
+  仅在用户显式调用 `$iflytek-digital-human:avatar-workflow-entry` 或
+  `/iflytek-digital-human:avatar-workflow-entry` 时执行。禁止依据“虚拟人”、
+  “avatar”、 “xfyun”等自然语言关键词自动触发，也不要因为其他项目的代码、日志或历史引用这些词而触发。
+  被显式调用后，负责讯飞虚拟人 Web 模板、Web/Android/iOS SDK、WebAPI、直播、模型与知识库配置及故障排查的统一路由。
 ---
 
 # avatar-workflow-entry: 智能路由入口
@@ -42,9 +40,10 @@ description: >-
 
 ## 调用时机
 
-- 用户提出虚拟人相关需求
-- 明确的问题场景（故障排查、配置调整）
-- 模糊的需求场景（需要澄清）
+- 仅当用户在当前消息显式调用 `$iflytek-digital-human:avatar-workflow-entry` 或
+  `/iflytek-digital-human:avatar-workflow-entry` 时进入本入口。
+- 用户只提到“虚拟人”、`avatar`、`xfyun` 或相关业务词时，不得自动进入本入口。
+- 其他项目的代码、日志、历史消息或文件内容出现这些词时，也不得触发本入口。
 
 ---
 

@@ -27,9 +27,22 @@ description: >-
 引导用户获取虚拟人平台凭据，并验证凭据有效性。
 
 **调用时机**:
-- `avatar-preflight` Layer 1 凭据验证
-- 凭据配置错误时
-- 首次接入时
+- 仅由已显式调用的 `avatar-workflow-entry` 路由，或用户显式调用本 skill 时执行。
+- 不得因为“虚拟人”、`avatar`、`xfyun` 等关键词自动触发。
+- `avatar-preflight` Layer 1 凭据验证、凭据配置错误、首次接入均属于已进入工作流后的调用场景。
+
+## 订阅产品创建（无验证码）
+
+登录成功并查询应用列表后，如果没有满足当前接入方式的应用，优先在插件根目录执行：
+
+```powershell
+python tools/xfyun_subscription.py 1  # SDK/WebAPI 接口产品
+python tools/xfyun_subscription.py 2  # Web 模板/PC 助手/数字人直播标准产品
+```
+
+该接口当前不需要验证码。`appType=1` 为接口产品，提交后平台自动审核，随后可继续查询应用和凭据；
+`appType=2` 为标准产品，提交后仍需等待运营审核，审核通过前不得创建 Web 模板或数字人产品。
+自定义名称等字段时使用脚本的命令行参数；没有登录会话时先执行 `python tools/xfyun_common.py login`。
 
 ---
 
@@ -205,8 +218,10 @@ python tools/write_env_safe.py YOUR_APP_ID 336130030977552384 ~/.env
 │   ├── YES: 使用自动化工具
 │   │   ├── 登录: python tools/xfyun_common.py login（在插件根目录执行）
 │   │   ├── 检查应用: POST /app/query → 判断 appType/auths (见 references/app-authorization-check.md)
-│   │   │   ├── 无应用 → 问需求 → 推荐订阅类型 → 给链接 → [等用户订阅]
-│   │   │   ├── 授权不足 → 提示缺什么 → 给链接重订阅 → [等用户订阅]
+│   │   │   ├── 无应用 → 按需求调用 xfyun_subscription.py(1/2)
+│   │   │   │             ├── appType=1 → 自动审核后继续查询应用/凭据
+│   │   │   │             └── appType=2 → 提交后等待运营审核，停止创建流程
+│   │   │   ├── 授权不足 → 按缺失能力调用对应订阅类型 → 等待平台状态
 │   │   │   └── ✓ 正常 → 存 appType/auths/appId → 继续
 │   │   ├── 查询场景: python tools/xfyun_query_services.py
 │   │   ├── 用户选择场景

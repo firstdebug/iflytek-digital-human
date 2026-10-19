@@ -4,8 +4,8 @@ description: >-
   讯飞虚拟人 WebAPI（报文）接入——不使用任何 SDK，直连 WebSocket，手工构造 JSON 请求报文、解析 JSON
   响应报文。当用户想用后端语言(Python/Java/Node)直接对接
   wss://avatar.cn-huadong-1.xf-yun.com/v1/interact、搭建能看到请求/响应报文的
-  demo、校验报文字段是否合规、解读 event_type/vmr_status/错误码时使用。触发词：WebAPI、web
-  api、报文、协议接入、不用SDK、直连WebSocket、请求响应、ctrl、event_type。
+  demo、校验报文字段是否合规、解读 event_type/vmr_status/错误码时使用。仅由已显式调用的
+  avatar-workflow-entry 路由或用户显式调用本 skill 时执行，不依据 WebAPI、报文或协议关键词自动触发。
 ---
 
 # avatar-webapi-protocol: WebAPI 报文接入
@@ -42,6 +42,10 @@ WebAPI 报文接入需要 **6 项完整凭据**，且所有参数必须是该场
 
 ### 凭据获取优先级
 
+WebAPI 使用接口产品 `appType=1`。查询不到有效的接口产品时，在插件根目录直接执行
+`python tools/xfyun_subscription.py 1` 提交申请；当前订阅接口不需要验证码，平台自动审核，
+后续以 `list-apps` 和凭据查询的实际状态为准。不要用标准产品 `appType=2` 代替 WebAPI 接入。
+
 **推荐方式**：通过平台工具获取
 ```bash
 cd "<plugin-root>"
@@ -66,12 +70,10 @@ python tools/write_env_safe.py <app_id> <scene_id> <output_path>
 
 这些是通用默认值，适用于大多数场景。如果特定场景未授权，工具会提示切换。
 
-## 触发条件 / 调用时机
+## 调用时机
 
-- 用户明确说"用 WebAPI / 不用 SDK / 直连 WebSocket / 手写报文"对接虚拟人
-- 用户想搭一个能打印/查看请求响应报文的 demo
-- 用户拿着一段请求或响应 JSON,问"这样对不对 / 这个响应什么意思 / 报了什么错"
-- 用户要生成鉴权 URL、构造某个协议的请求报文
+- 仅由已显式调用的 `avatar-workflow-entry` 路由，或用户显式调用本 skill 时执行。
+- 进入后可处理 WebAPI、报文、协议、鉴权 URL 和请求响应 JSON；这些词本身不能触发本 skill。
 
 ## 核心工作流(以"搭出可看报文的 demo"为目标)
 

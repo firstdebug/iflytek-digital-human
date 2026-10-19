@@ -310,6 +310,23 @@ class PluginConsistencyTests(unittest.TestCase):
         self.assertIn("module.default", playbook)
         self.assertIn("auth-verification.md", playbook)
 
+    def test_avatar_entry_requires_explicit_invocation(self):
+        entry = (SKILLS_ROOT / "avatar-workflow-entry" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("仅当用户在当前消息显式调用", entry)
+        self.assertIn("不得自动进入本入口", entry)
+        self.assertIn("不得触发本入口", entry)
+
+    def test_subscription_tool_is_registered(self):
+        subscription = next(
+            tool for tool in self.tools_config["tools"]
+            if tool["name"] == "create-subscription-order"
+        )
+        self.assertEqual(subscription["path"], "tools/xfyun_subscription.py")
+        self.assertIn("appType=1", subscription["description"])
+        self.assertIn("appType=2", subscription["description"])
+
     def test_sdk_docs_do_not_claim_permanent_or_fabricated_download_links(self):
         forbidden = (
             "无过期时间",

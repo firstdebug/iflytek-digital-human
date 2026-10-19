@@ -150,6 +150,10 @@ checks:
 
 **⚠️ 强制执行规则（不可跳过）**:
 
+0. **接口产品订阅前置**：SDK/WebAPI 接入必须使用 `appType=1` 接口产品。若 `list-apps` 没有有效的
+   `appType=1` 应用，先执行 `python tools/xfyun_subscription.py 1`；当前提交不需要验证码，平台自动审核，
+   后续以查询到的应用和凭据为准。不要用 `appType=2` 标准产品替代 SDK 接入。
+
 1. **第一步：主 agent 必须先 Read playbook 全文**
    - Android: `Read <plugin-root>/skills/avatar-executing/references/android-sdk-build-playbook.md`
    - Web: `Read <plugin-root>/skills/avatar-executing/references/web-sdk-build-playbook.md`
